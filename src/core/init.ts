@@ -10,10 +10,59 @@ import { savePawConfig, loadPawConfig } from "./paw-config";
 import type { InstallOptions } from "../types";
 
 /**
+ * Normalize a git URL for comparison
+ * Handles SSH (git@github.com:user/repo) vs HTTPS (https://github.com/user/repo)
+ */
+function normalizeGitUrl(url: string): string {
+  let normalized = url.trim();
+
+  // Remove trailing .git
+  normalized = normalized.replace(/\.git$/, "");
+
+  // Convert SSH to HTTPS format for comparison
+  // git@github.com:user/repo -> github.com/user/repo
+  const sshMatch = normalized.match(/^git@([^:]+):(.+)$/);
+  if (sshMatch) {
+    normalized = `${sshMatch[1]}/${sshMatch[2]}`;
+  }
+
+  // Extract domain/path from HTTPS
+  // https://github.com/user/repo -> github.com/user/repo
+  const httpsMatch = normalized.match(/^https?:\/\/(.+)$/);
+  if (httpsMatch) {
+    normalized = httpsMatch[1];
+  }
+
+  return normalized.toLowerCase();
+}
+
+/**
+ * Validate that a string looks like a git repository URL
+ */
+function isValidGitUrl(url: string): boolean {
+  // HTTPS format
+  if (/^https?:\/\/[^/]+\/.+/.test(url)) {
+    return true;
+  }
+  // SSH format
+  if (/^git@[^:]+:.+/.test(url)) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Initialize paw with a dotfiles repository
  */
 export async function runInit(repoUrl: string, options: InstallOptions & { path?: string }): Promise<boolean> {
   logger.header("Paw Init");
+
+  // Validate repoUrl format
+  if (!isValidGitUrl(repoUrl)) {
+    logger.error("Invalid repository URL format");
+    logger.info("Expected: https://github.com/user/repo or git@github.com:user/repo");
+    return false;
+  }
 
   // Check if already initialized
   const existingConfig = await loadPawConfig();
@@ -48,9 +97,17 @@ export async function runInit(repoUrl: string, options: InstallOptions & { path?
     const remoteResult = await $`git -C ${clonePath} remote get-url origin`.quiet().nothrow();
     if (remoteResult.exitCode === 0) {
       const existingRemote = remoteResult.text().trim();
-      if (existingRemote === repoUrl || existingRemote === `${repoUrl}.git`) {
+      // Use normalized comparison to handle SSH vs HTTPS differences
+      if (normalizeGitUrl(existingRemote) === normalizeGitUrl(repoUrl)) {
         logger.info("Repository already cloned, pulling latest...");
-        await $`git -C ${clonePath} pull --rebase`.quiet().nothrow();
+        const pullResult = await $`git -C ${clonePath} pull --rebase`.quiet().nothrow();
+        if (pullResult.exitCode !== 0) {
+          logger.warn("Pull failed, continuing with existing state");
+          const stderr = pullResult.stderr.toString().trim();
+          if (stderr) {
+            logger.debug(stderr, options.verbose);
+          }
+        }
       } else {
         logger.error(`Directory exists with different remote: ${existingRemote}`);
         return false;
@@ -65,6 +122,7 @@ export async function runInit(repoUrl: string, options: InstallOptions & { path?
     const cloneResult = await $`git clone ${repoUrl} ${clonePath}`.nothrow();
     if (cloneResult.exitCode !== 0) {
       logger.error("Failed to clone repository");
+      logger.error(cloneResult.stderr.toString());
       return false;
     }
     logger.success("Repository cloned");
