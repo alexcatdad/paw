@@ -151,3 +151,14 @@ export interface SyncOptions extends InstallOptions {
   /** Automatically update paw without prompting */
   autoUpdate: boolean;
 }
+
+// ============================================================================
+// Paw Configuration (stored in ~/.config/paw/config.json)
+// ============================================================================
+
+export interface PawConfig {
+  /** Path to the dotfiles repository */
+  dotfilesRepo: string;
+  /** Remote URL of the dotfiles repository */
+  repoUrl: string;
+}
