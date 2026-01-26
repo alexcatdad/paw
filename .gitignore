@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Build output
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Test coverage
+coverage/
+
+# Environment
+.env
+.env.local
