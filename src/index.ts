@@ -15,6 +15,7 @@ import { addSuggestions, SSH_SUGGESTIONS } from "./core/suggestions";
 import { logger } from "./core/logger";
 import { performUpdate } from "./core/update";
 import { runSync, printSyncSummary } from "./core/sync";
+import { runInit } from "./core/init";
 import type { InstallOptions, BackupEntry, SyncOptions } from "./types";
 import pkg from "../package.json";
 
@@ -31,6 +32,7 @@ ${"\x1b[1m"}USAGE${"\x1b[0m"}
   paw <command> [options]
 
 ${"\x1b[1m"}COMMANDS${"\x1b[0m"}
+  init <repo-url>  Clone dotfiles repo and configure paw
   install          Full setup: install packages and create symlinks
   link             Create symlinks only (skip package installation)
   unlink           Remove all managed symlinks
@@ -48,6 +50,7 @@ ${"\x1b[1m"}OPTIONS${"\x1b[0m"}
   -f, --force          Overwrite existing files (creates backups)
   -v, --verbose        Show detailed output
   --skip-packages      Skip package installation (install command only)
+  -p, --path <path>    Clone path for init command (default: ~/dotfiles)
   -q, --quiet          Suppress output (sync command)
   --skip-update        Skip paw binary update check (sync command)
   --auto-update        Auto-update paw without prompting (sync command)
@@ -55,6 +58,7 @@ ${"\x1b[1m"}OPTIONS${"\x1b[0m"}
   --version            Show version number
 
 ${"\x1b[1m"}EXAMPLES${"\x1b[0m"}
+  paw init <repo-url>      # Clone dotfiles and run install
   paw install              # Full installation
   paw install --dry-run    # Preview installation
   paw link --force         # Force symlinks with backup
@@ -525,6 +529,7 @@ async function main(): Promise<void> {
       "force": { type: "boolean", short: "f", default: false },
       "verbose": { type: "boolean", short: "v", default: false },
       "skip-packages": { type: "boolean", default: false },
+      "path": { type: "string", short: "p" },
       "quiet": { type: "boolean", short: "q", default: false },
       "skip-update": { type: "boolean", default: false },
       "auto-update": { type: "boolean", default: false },
@@ -590,6 +595,23 @@ async function main(): Promise<void> {
           autoUpdate: values["auto-update"] as boolean,
         };
         await syncCommand(syncOptions);
+        break;
+      }
+
+      case "init": {
+        const repoUrl = subArgs[0];
+        if (!repoUrl) {
+          logger.error("Usage: paw init <repo-url> [--path <path>]");
+          process.exit(1);
+        }
+        const initSuccess = await runInit(repoUrl, {
+          ...options,
+          path: values.path as string | undefined,
+        });
+        if (initSuccess && !options.dryRun) {
+          // Run install after successful init
+          await installCommand(options);
+        }
         break;
       }
 
