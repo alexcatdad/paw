@@ -72,7 +72,8 @@ ${"\x1b[1m"}EXAMPLES${"\x1b[0m"}
   paw backup clean         # Clean old backups
 
 ${"\x1b[1m"}FIRST TIME SETUP${"\x1b[0m"}
-  curl -fsSL https://raw.githubusercontent.com/alexcatdad/dotfiles/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/alexcatdad/paw/main/install.sh | bash
+  paw init https://github.com/yourusername/dotfiles
 `);
 }
 
