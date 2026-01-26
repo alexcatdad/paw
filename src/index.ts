@@ -16,6 +16,7 @@ import { logger } from "./core/logger";
 import { performUpdate } from "./core/update";
 import { runSync, printSyncSummary } from "./core/sync";
 import { runInit } from "./core/init";
+import { runPush } from "./core/push";
 import type { InstallOptions, BackupEntry, SyncOptions } from "./types";
 import pkg from "../package.json";
 
@@ -33,6 +34,7 @@ ${"\x1b[1m"}USAGE${"\x1b[0m"}
 
 ${"\x1b[1m"}COMMANDS${"\x1b[0m"}
   init <repo-url>  Clone dotfiles repo and configure paw
+  push [message]   Commit and push dotfiles changes
   install          Full setup: install packages and create symlinks
   link             Create symlinks only (skip package installation)
   unlink           Remove all managed symlinks
@@ -612,6 +614,12 @@ async function main(): Promise<void> {
           // Run install after successful init
           await installCommand(options);
         }
+        break;
+      }
+
+      case "push": {
+        const message = subArgs.join(" ") || undefined;
+        await runPush(message, options);
         break;
       }
 
