@@ -180,8 +180,10 @@ export async function performUpdate(options: InstallOptions): Promise<boolean> {
     return false;
   }
 
-  // Check if this is a compiled binary (not running from bun)
-  const isCompiled = !binaryPath.endsWith(".ts") && !process.argv[0]?.includes("bun");
+  // Check if this is a compiled binary
+  // In compiled Bun binaries, process.argv[0] is "bun" and process.execPath is the binary path
+  // In dev mode (bun run), process.argv[0] is the full path to bun like /opt/homebrew/bin/bun
+  const isCompiled = !binaryPath.endsWith(".ts") && (process.argv[0] === "bun" || !process.argv[0]?.includes("/"));
   if (!isCompiled && !options.force) {
     logger.warn("Running from source, not a compiled binary.");
     logger.info("To update: git pull && bun install");
