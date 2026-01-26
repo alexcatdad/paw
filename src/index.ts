@@ -393,10 +393,7 @@ async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   const result = await runSync(options);
-
-  if (!options.quiet) {
-    printSyncSummary(result);
-  }
+  printSyncSummary(result, options.quiet);
 }
 
 /**

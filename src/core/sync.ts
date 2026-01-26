@@ -213,6 +213,7 @@ export async function runSync(options: SyncOptions): Promise<SyncResult> {
   }
 
   result.repoUpdated = true;
+  result.filesUpdated = changedFiles.length;
 
   if (!options.quiet && changedFiles.length > 0) {
     logger.info(`Updated ${changedFiles.length} file(s)`);
@@ -265,9 +266,28 @@ export async function runSync(options: SyncOptions): Promise<SyncResult> {
 }
 
 /**
- * Print sync summary
+ * Print sync summary (brief for quiet mode with updates)
  */
-export function printSyncSummary(result: SyncResult): void {
+export function printSyncSummary(result: SyncResult, quiet: boolean = false): void {
+  // Brief notification format for quiet mode when there are updates
+  if (quiet && (result.repoUpdated || result.pawUpdated)) {
+    const parts: string[] = [];
+    if (result.filesUpdated && result.filesUpdated > 0) {
+      parts.push(`${result.filesUpdated} file(s) updated`);
+    }
+    if (result.linksRefreshed) {
+      parts.push("symlinks refreshed");
+    }
+    if (result.pawUpdated) {
+      parts.push("paw updated");
+    }
+    if (parts.length > 0) {
+      console.log(`✓ Dotfiles synced (${parts.join(", ")})`);
+    }
+    return;
+  }
+
+  // Full summary for non-quiet mode
   if (!result.pawUpdated && !result.repoUpdated && !result.linksRefreshed) {
     logger.success("Everything is up to date!");
     return;

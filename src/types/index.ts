@@ -141,6 +141,8 @@ export interface SyncResult {
   repoUpdated: boolean;
   /** Whether symlinks were refreshed */
   linksRefreshed: boolean;
+  /** Number of files updated during sync */
+  filesUpdated?: number;
 }
 
 export interface SyncOptions extends InstallOptions {
