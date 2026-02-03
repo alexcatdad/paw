@@ -2,7 +2,7 @@
 
 Personal dotfiles manager CLI built with TypeScript and Bun.
 
-> [!CAUTION]
+> [!WARNING]
 > ## A BIG ASS WARNING
 >
 > **FORK THIS REPO. DON'T USE MINE.**
