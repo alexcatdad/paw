@@ -4,6 +4,18 @@
 
 export type Platform = "darwin" | "linux";
 
+export interface SymlinkCondition {
+  /** Glob pattern matched against os.hostname() */
+  hostname?: string;
+  /** Target platform */
+  platform?: Platform;
+}
+
+export type SymlinkTarget = string | {
+  target: string;
+  when: SymlinkCondition;
+};
+
 export interface PackageConfig {
   /** Packages to install on all platforms via Homebrew */
   common: string[];
@@ -38,7 +50,7 @@ export interface HookContext {
 
 export interface DotfilesConfig {
   /** Symlink mappings: source (relative to config/) -> target (relative to $HOME) */
-  symlinks: Record<string, string>;
+  symlinks: Record<string, SymlinkTarget>;
   /** Packages to install by platform */
   packages: PackageConfig;
   /** Template files for machine-specific config: source -> target */
