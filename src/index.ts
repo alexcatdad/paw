@@ -18,6 +18,7 @@ import { runSync, printSyncSummary } from "./core/sync";
 import { runInit } from "./core/init";
 import { runPush } from "./core/push";
 import { runAudit, printAuditResults } from "./core/audit";
+import { scaffoldConfigs, listAvailableConfigs } from "./core/scaffold";
 import type { InstallOptions, BackupEntry, SyncOptions, AuditOptions } from "./types";
 import pkg from "../package.json";
 
@@ -47,6 +48,7 @@ ${"\x1b[1m"}COMMANDS${"\x1b[0m"}
   backup restore   Restore a specific backup file
   backup clean     Remove old backups based on retention policy
   audit            Analyze dotfiles repo structure and completeness
+  scaffold [configs] List or create missing config templates
   doctor           Check dotfiles health and diagnose issues
 
 ${"\x1b[1m"}OPTIONS${"\x1b[0m"}
@@ -540,6 +542,36 @@ async function auditCommand(options: AuditOptions & { verbose: boolean }): Promi
 }
 
 /**
+ * Scaffold command - generate missing configs
+ */
+async function scaffoldCommand(configs: string[], options: InstallOptions): Promise<void> {
+  const repoDir = getRepoDir();
+
+  if (configs.length === 0 || configs[0] === "list") {
+    logger.header("Available Configs to Scaffold");
+    listAvailableConfigs();
+    logger.newline();
+    logger.info("Usage: paw scaffold <config-name> [config-name...]");
+    logger.info("Example: paw scaffold 'Shell Config' 'Git Config'");
+    return;
+  }
+
+  logger.header("Scaffolding Configs");
+  const created = await scaffoldConfigs(repoDir, configs, {
+    dryRun: options.dryRun,
+    force: options.force,
+  });
+
+  logger.newline();
+  if (options.dryRun) {
+    logger.info(`Would create ${created} config(s)`);
+  } else {
+    logger.success(`Created ${created} config(s)`);
+    logger.info("Remember to add these to your dotfiles.config.ts symlinks!");
+  }
+}
+
+/**
  * Main entry point
  */
 async function main(): Promise<void> {
@@ -659,6 +691,10 @@ async function main(): Promise<void> {
         await auditCommand(auditOptions);
         break;
       }
+
+      case "scaffold":
+        await scaffoldCommand(subArgs, options);
+        break;
 
       case "help":
         printHelp();
