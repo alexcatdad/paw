@@ -143,9 +143,12 @@ export async function getPawBinaryPath(): Promise<string | null> {
 }
 
 /**
- * Download the binary for the current platform
+ * Download the binary for the current platform with optional verification
  */
-export async function downloadBinary(targetDir: string, options: InstallOptions): Promise<string | null> {
+export async function downloadBinary(
+  targetDir: string,
+  options: InstallOptions & { skipVerify?: boolean }
+): Promise<string | null> {
   const binaryName = getBinaryName();
 
   if (options.dryRun) {
@@ -154,12 +157,39 @@ export async function downloadBinary(targetDir: string, options: InstallOptions)
   }
 
   try {
-    const result = await $`gh release download latest --repo ${REPO} --pattern ${binaryName} --dir ${targetDir}`.quiet().nothrow();
+    // Check if gh supports --verify-attestation
+    const helpResult = await $`gh release download --help`.quiet().nothrow();
+    const supportsVerify = helpResult.text().includes("verify-attestation");
 
-    if (result.exitCode !== 0) {
-      const stderr = result.stderr.toString();
-      logger.error(`Failed to download binary: ${stderr}`);
-      return null;
+    if (supportsVerify && !options.skipVerify) {
+      logger.info("Downloading with attestation verification...");
+      const result = await $`gh release download latest --repo ${REPO} --pattern ${binaryName} --dir ${targetDir} --verify-attestation`.quiet().nothrow();
+
+      if (result.exitCode !== 0) {
+        const stderr = result.stderr.toString();
+
+        if (stderr.includes("attestation")) {
+          logger.error("Binary verification failed - attestation invalid or missing");
+          logger.info("Use --skip-verify to bypass verification (not recommended)");
+          return null;
+        }
+
+        logger.error(`Failed to download binary: ${stderr}`);
+        return null;
+      }
+
+      logger.success("Binary attestation verified");
+    } else {
+      if (!options.skipVerify && !supportsVerify) {
+        logger.warn("gh CLI doesn't support attestation verification. Consider updating gh.");
+      }
+
+      const result = await $`gh release download latest --repo ${REPO} --pattern ${binaryName} --dir ${targetDir}`.quiet().nothrow();
+
+      if (result.exitCode !== 0) {
+        logger.error(`Failed to download binary: ${result.stderr.toString()}`);
+        return null;
+      }
     }
 
     return `${targetDir}/${binaryName}`;
@@ -172,7 +202,7 @@ export async function downloadBinary(targetDir: string, options: InstallOptions)
 /**
  * Perform the self-update
  */
-export async function performUpdate(options: InstallOptions): Promise<boolean> {
+export async function performUpdate(options: InstallOptions & { skipVerify?: boolean }): Promise<boolean> {
   const currentVersion = pkg.version;
   const binaryPath = await getPawBinaryPath();
 

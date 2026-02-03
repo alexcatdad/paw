@@ -62,6 +62,7 @@ ${"\x1b[1m"}OPTIONS${"\x1b[0m"}
   --skip-update        Skip paw binary update check (sync command)
   --auto-update        Auto-update paw without prompting (sync command)
   --json               Output as JSON (audit command)
+  --skip-verify        Skip binary attestation verification (update command)
   -h, --help           Show this help message
   --version            Show version number
 
@@ -386,7 +387,7 @@ async function rollbackCommand(options: InstallOptions): Promise<void> {
 /**
  * Update command - self-update
  */
-async function updateCommand(options: InstallOptions): Promise<void> {
+async function updateCommand(options: InstallOptions & { skipVerify?: boolean }): Promise<void> {
   logger.header("Self Update");
   await performUpdate(options);
 }
@@ -589,6 +590,7 @@ async function main(): Promise<void> {
       "auto-update": { type: "boolean", default: false },
       "json": { type: "boolean", default: false },
       "no-interactive": { type: "boolean", default: false },
+      "skip-verify": { type: "boolean", default: false },
       "help": { type: "boolean", short: "h", default: false },
       "version": { type: "boolean", default: false },
     },
@@ -678,9 +680,14 @@ async function main(): Promise<void> {
         break;
       }
 
-      case "update":
-        await updateCommand(options);
+      case "update": {
+        const updateOptions = {
+          ...options,
+          skipVerify: values["skip-verify"] as boolean,
+        };
+        await updateCommand(updateOptions);
         break;
+      }
 
       case "doctor":
         await doctorCommand(options);
