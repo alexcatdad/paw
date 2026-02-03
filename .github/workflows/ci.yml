@@ -48,10 +48,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for secrets
+      - name: Check for secrets (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for personal info leaks
+        run: ./scripts/security-check.sh
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Test on macOS
