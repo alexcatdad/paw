@@ -2,24 +2,21 @@
 
 Personal dotfiles manager CLI built with TypeScript and Bun.
 
----
-
-## A BIG ASS WARNING
-
-**USE AT YOUR OWN RISK.**
-
-This tool makes potentially **destructive changes** to your home directory:
-
-- **Creates symlinks** that overwrite existing files (backs up originals, but still)
-- **Executes arbitrary code** from your `dotfiles.config.ts` (hooks run with your full permissions)
-- **Installs packages** via Homebrew/apt (runs `brew install`, `sudo apt install`)
-- **Self-updates** by downloading binaries from GitHub
-
-This is an open source tool with **no warranty**. Review the code, understand what it does, and use it at your own risk. If you're not comfortable with a tool modifying `~/.zshrc`, `~/.gitconfig`, etc., this isn't for you.
-
-**You have been warned.**
-
----
+> [!CAUTION]
+> ## A BIG ASS WARNING
+>
+> **USE AT YOUR OWN RISK.**
+>
+> This tool makes potentially **destructive changes** to your home directory:
+>
+> - **Creates symlinks** that overwrite existing files (backs up originals, but still)
+> - **Executes arbitrary code** from your `dotfiles.config.ts` (hooks run with your full permissions)
+> - **Installs packages** via Homebrew/apt (runs `brew install`, `sudo apt install`)
+> - **Self-updates** by downloading binaries from GitHub
+>
+> This is an open source tool with **no warranty**. Review the code, understand what it does, and use it at your own risk. If you're not comfortable with a tool modifying `~/.zshrc`, `~/.gitconfig`, etc., this isn't for you.
+>
+> **You have been warned.**
 
 ## Installation
 
