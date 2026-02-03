@@ -232,3 +232,20 @@ export function isValidPackageName(name: string): boolean {
   // Allow: letters, numbers, hyphens, underscores, slashes (for casks), @ (for scoped packages)
   return /^[@a-zA-Z0-9_\/-]+$/.test(name) && name.length > 0 && name.length < 256;
 }
+
+/**
+ * Match a value against a glob pattern (supports * and ? wildcards)
+ */
+export function matchGlob(value: string, pattern: string): boolean {
+  const regex = new RegExp(
+    "^" + pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$"
+  );
+  return regex.test(value);
+}
+
+/**
+ * Get the system hostname
+ */
+export function getHostname(): string {
+  return require("os").hostname();
+}
