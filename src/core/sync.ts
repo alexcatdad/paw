@@ -10,7 +10,8 @@ import { checkForUpdate, performUpdate } from "./update";
 import { loadConfig } from "./config";
 import { createSymlinks, statesToEntries } from "./symlinks";
 import { saveLastRunState } from "./backup";
-import type { SyncResult, SyncOptions, BackupEntry } from "../types";
+import { createHookContext, runHook } from "./hooks";
+import type { SyncResult, SyncOptions, BackupEntry, SyncHookContext } from "../types";
 
 /**
  * Check if the repo is behind origin
@@ -160,6 +161,19 @@ export async function runSync(options: SyncOptions): Promise<SyncResult> {
     linksRefreshed: false,
   };
 
+  // Load config for hooks
+  let config;
+  try {
+    config = await loadConfig();
+  } catch {
+    // Config might not exist yet, that's ok
+  }
+
+  // Run preSync hook
+  if (config?.hooks?.preSync) {
+    await runHook(config, "preSync", createHookContext(options.dryRun));
+  }
+
   // Step 1: Check for paw updates (unless skipped)
   if (!options.skipUpdate) {
     const latestVersion = await checkForUpdate({ force: options.dryRun });
@@ -260,6 +274,16 @@ export async function runSync(options: SyncOptions): Promise<SyncResult> {
     if (!options.quiet) {
       logger.info(`${linked} symlink(s) refreshed`);
     }
+  }
+
+  // Run postSync hook
+  if (config?.hooks?.postSync) {
+    const syncContext: SyncHookContext = {
+      ...createHookContext(options.dryRun),
+      filesChanged: changedFiles,
+      linksRefreshed: result.linksRefreshed,
+    };
+    await runHook(config, "postSync", syncContext);
   }
 
   return result;
