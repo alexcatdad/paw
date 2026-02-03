@@ -5,10 +5,42 @@
 
 import { mkdir, symlink, unlink, readlink, rename, lstat, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import type { SymlinkState, InstallOptions, SymlinkEntry } from "../types";
+import type { SymlinkState, InstallOptions, SymlinkEntry, SymlinkTarget, SymlinkCondition } from "../types";
 import { logger } from "./logger";
-import { getHomeDir, contractPath, validatePathWithinBase } from "./os";
+import { getHomeDir, contractPath, validatePathWithinBase, getPlatform, matchGlob, getHostname } from "./os";
 import { resolveConfigPath } from "./config";
+
+/**
+ * Check if a symlink should be created based on conditions
+ */
+function shouldCreateSymlink(condition: SymlinkCondition | undefined): { create: boolean; reason?: string } {
+  if (!condition) {
+    return { create: true };
+  }
+
+  if (condition.platform && getPlatform() !== condition.platform) {
+    return { create: false, reason: `platform ${condition.platform} ≠ ${getPlatform()}` };
+  }
+
+  if (condition.hostname) {
+    const currentHostname = getHostname();
+    if (!matchGlob(currentHostname, condition.hostname)) {
+      return { create: false, reason: `hostname ${condition.hostname} ≠ ${currentHostname}` };
+    }
+  }
+
+  return { create: true };
+}
+
+/**
+ * Normalize symlink target to extract target path and condition
+ */
+function normalizeSymlinkTarget(target: SymlinkTarget): { targetPath: string; condition?: SymlinkCondition } {
+  if (typeof target === "string") {
+    return { targetPath: target };
+  }
+  return { targetPath: target.target, condition: target.when };
+}
 
 /**
  * Check if a file or symlink exists at the given path
@@ -122,15 +154,28 @@ async function createSymlink(
  * Create symlinks for all configured files
  */
 export async function createSymlinks(
-  symlinks: Record<string, string>,
+  symlinks: Record<string, SymlinkTarget>,
   options: InstallOptions
 ): Promise<SymlinkState[]> {
   const homeDir = getHomeDir();
   const states: SymlinkState[] = [];
 
-  for (const [sourceRel, targetRel] of Object.entries(symlinks)) {
+  for (const [sourceRel, targetConfig] of Object.entries(symlinks)) {
+    const { targetPath, condition } = normalizeSymlinkTarget(targetConfig);
     const source = resolveConfigPath(sourceRel);
-    const target = resolve(homeDir, targetRel);
+    const target = resolve(homeDir, targetPath);
+
+    // Check if symlink should be created based on conditions
+    const { create, reason } = shouldCreateSymlink(condition);
+    if (!create) {
+      logger.skip(`${contractPath(target)} (skipped: ${reason})`);
+      states.push({
+        source,
+        target,
+        status: "missing", // Use missing for skipped conditional symlinks
+      });
+      continue;
+    }
 
     // Security: Prevent path traversal attacks
     validatePathWithinBase(target, homeDir, "Symlink target");
@@ -146,13 +191,14 @@ export async function createSymlinks(
  * Remove all managed symlinks
  */
 export async function removeSymlinks(
-  symlinks: Record<string, string>,
+  symlinks: Record<string, SymlinkTarget>,
   options: InstallOptions
 ): Promise<void> {
   const homeDir = getHomeDir();
 
-  for (const [_, targetRel] of Object.entries(symlinks)) {
-    const target = resolve(homeDir, targetRel);
+  for (const [_, targetConfig] of Object.entries(symlinks)) {
+    const { targetPath } = normalizeSymlinkTarget(targetConfig);
+    const target = resolve(homeDir, targetPath);
 
     // Security: Prevent path traversal attacks
     validatePathWithinBase(target, homeDir, "Symlink target");
@@ -180,14 +226,18 @@ export async function removeSymlinks(
  * Get the current status of all symlinks
  */
 export async function getSymlinkStatus(
-  symlinks: Record<string, string>
+  symlinks: Record<string, SymlinkTarget>
 ): Promise<SymlinkState[]> {
   const homeDir = getHomeDir();
   const states: SymlinkState[] = [];
 
-  for (const [sourceRel, targetRel] of Object.entries(symlinks)) {
+  for (const [sourceRel, targetConfig] of Object.entries(symlinks)) {
+    const { targetPath, condition } = normalizeSymlinkTarget(targetConfig);
     const source = resolveConfigPath(sourceRel);
-    const target = resolve(homeDir, targetRel);
+    const target = resolve(homeDir, targetPath);
+
+    // Check conditions for status display
+    const { create } = shouldCreateSymlink(condition);
 
     // Security: Prevent path traversal attacks
     validatePathWithinBase(target, homeDir, "Symlink target");
@@ -197,6 +247,12 @@ export async function getSymlinkStatus(
       target,
       status: "missing",
     };
+
+    // If condition not met, show as skipped in status
+    if (!create) {
+      states.push(state);
+      continue;
+    }
 
     // Check if source exists
     try {

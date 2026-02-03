@@ -5,7 +5,7 @@
 
 import { readdir, stat } from "node:fs/promises";
 import { resolve, relative } from "node:path";
-import type { AuditFinding, AuditResult, AuditOptions, DotfilesConfig } from "../types";
+import type { AuditFinding, AuditResult, AuditOptions, DotfilesConfig, SymlinkTarget } from "../types";
 import { COMMON_CONFIGS, type CommonConfig } from "./audit-patterns";
 import { getPlatform } from "./os";
 import { logger } from "./logger";
@@ -105,8 +105,12 @@ function checkMissingConfigs(files: string[], config?: DotfilesConfig): AuditFin
   const findings: AuditFinding[] = [];
   const platform = getPlatform();
 
-  // Get symlink targets if config exists
-  const symlinkTargets = config ? Object.values(config.symlinks) : [];
+  // Get symlink targets if config exists (extract target path from SymlinkTarget)
+  const symlinkTargets = config
+    ? Object.values(config.symlinks).map((t: SymlinkTarget) =>
+        typeof t === "string" ? t : t.target
+      )
+    : [];
   const allFiles = [...files, ...symlinkTargets];
 
   for (const commonConfig of COMMON_CONFIGS) {
