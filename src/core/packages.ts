@@ -5,7 +5,7 @@
 
 import { $ } from "bun";
 import type { PackageConfig, Platform, InstallOptions } from "../types";
-import { detectPackageManagers, commandExists, getPlatform } from "./os";
+import { detectPackageManagers, commandExists, getPlatform, isValidPackageName } from "./os";
 import { logger } from "./logger";
 
 /**
@@ -107,6 +107,12 @@ async function installBrewPackage(
   brewPath: string,
   options: InstallOptions
 ): Promise<boolean> {
+  // Security: Validate package name to prevent command injection
+  if (!isValidPackageName(pkg)) {
+    logger.error(`Invalid package name: ${pkg}`);
+    return false;
+  }
+
   // Check if already installed
   if (await isBrewPackageInstalled(pkg, brewPath)) {
     logger.skip(`${pkg} (already installed)`);
@@ -152,6 +158,12 @@ async function installAptPackage(
   pkg: string,
   options: InstallOptions
 ): Promise<boolean> {
+  // Security: Validate package name to prevent command injection
+  if (!isValidPackageName(pkg)) {
+    logger.error(`Invalid package name: ${pkg}`);
+    return false;
+  }
+
   // Check if already installed
   try {
     const result = await $`dpkg -s ${pkg}`.quiet().nothrow();

@@ -7,7 +7,7 @@ import { mkdir, symlink, unlink, readlink, rename, lstat, stat } from "node:fs/p
 import { dirname, resolve } from "node:path";
 import type { SymlinkState, InstallOptions, SymlinkEntry } from "../types";
 import { logger } from "./logger";
-import { getHomeDir, contractPath } from "./os";
+import { getHomeDir, contractPath, validatePathWithinBase } from "./os";
 import { resolveConfigPath } from "./config";
 
 /**
@@ -132,6 +132,9 @@ export async function createSymlinks(
     const source = resolveConfigPath(sourceRel);
     const target = resolve(homeDir, targetRel);
 
+    // Security: Prevent path traversal attacks
+    validatePathWithinBase(target, homeDir, "Symlink target");
+
     const state = await createSymlink(source, target, options);
     states.push(state);
   }
@@ -150,6 +153,9 @@ export async function removeSymlinks(
 
   for (const [_, targetRel] of Object.entries(symlinks)) {
     const target = resolve(homeDir, targetRel);
+
+    // Security: Prevent path traversal attacks
+    validatePathWithinBase(target, homeDir, "Symlink target");
 
     try {
       const stats = await lstat(target);
@@ -182,6 +188,9 @@ export async function getSymlinkStatus(
   for (const [sourceRel, targetRel] of Object.entries(symlinks)) {
     const source = resolveConfigPath(sourceRel);
     const target = resolve(homeDir, targetRel);
+
+    // Security: Prevent path traversal attacks
+    validatePathWithinBase(target, homeDir, "Symlink target");
 
     const state: SymlinkState = {
       source,

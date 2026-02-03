@@ -7,7 +7,7 @@ import { mkdir, writeFile, stat } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { logger } from "./logger";
 import { COMMON_CONFIGS, type CommonConfig } from "./audit-patterns";
-import { getPlatform } from "./os";
+import { getPlatform, validatePathWithinBase } from "./os";
 
 interface ScaffoldOptions {
   dryRun: boolean;
@@ -147,6 +147,9 @@ export async function scaffoldConfigs(
 
     const filePath = getRecommendedPath(config);
     const fullPath = resolve(repoPath, filePath);
+
+    // Security: Prevent path traversal attacks
+    validatePathWithinBase(fullPath, repoPath, "Scaffold target");
 
     // Check if already exists
     try {

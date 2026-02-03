@@ -207,3 +207,28 @@ export function contractPath(path: string): string {
   }
   return path;
 }
+
+/**
+ * Validate that a resolved path is within an allowed base directory.
+ * Prevents path traversal attacks (e.g., "../../../etc/passwd").
+ * @throws Error if path escapes the allowed directory
+ */
+export function validatePathWithinBase(resolvedPath: string, allowedBase: string, context: string): void {
+  // Normalize both paths to handle trailing slashes
+  const normalizedPath = resolvedPath.endsWith("/") ? resolvedPath.slice(0, -1) : resolvedPath;
+  const normalizedBase = allowedBase.endsWith("/") ? allowedBase.slice(0, -1) : allowedBase;
+
+  // Path must either equal the base or be a subdirectory of it
+  if (normalizedPath !== normalizedBase && !normalizedPath.startsWith(normalizedBase + "/")) {
+    throw new Error(`Security error: ${context} path escapes allowed directory.\n  Path: ${resolvedPath}\n  Allowed: ${allowedBase}`);
+  }
+}
+
+/**
+ * Validate that a package name is safe (alphanumeric, hyphens, underscores, slashes, @)
+ * Prevents command injection via malicious package names.
+ */
+export function isValidPackageName(name: string): boolean {
+  // Allow: letters, numbers, hyphens, underscores, slashes (for casks), @ (for scoped packages)
+  return /^[@a-zA-Z0-9_\/-]+$/.test(name) && name.length > 0 && name.length < 256;
+}

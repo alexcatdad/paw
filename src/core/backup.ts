@@ -7,7 +7,7 @@ import { readdir, stat, unlink, rename } from "node:fs/promises";
 import { resolve, dirname, basename } from "node:path";
 import type { BackupEntry, LastRunState, BackupConfig, InstallOptions } from "../types";
 import { logger } from "./logger";
-import { getHomeDir, contractPath } from "./os";
+import { getHomeDir, contractPath, validatePathWithinBase } from "./os";
 
 /** Pattern for backup files: filename.backup.timestamp */
 const BACKUP_PATTERN = /^(.+)\.backup\.(\d+)$/;
@@ -141,9 +141,13 @@ export async function restoreBackup(
   backupPath: string,
   options: InstallOptions
 ): Promise<boolean> {
+  const homeDir = getHomeDir();
   const expandedPath = backupPath.startsWith("~")
-    ? resolve(getHomeDir(), backupPath.slice(2))
+    ? resolve(homeDir, backupPath.slice(2))
     : resolve(backupPath);
+
+  // Security: Prevent path traversal attacks - only allow backups within home directory
+  validatePathWithinBase(expandedPath, homeDir, "Backup restore");
 
   // Parse backup filename to get original name
   const filename = basename(expandedPath);
