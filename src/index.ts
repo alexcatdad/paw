@@ -17,7 +17,8 @@ import { performUpdate } from "./core/update";
 import { runSync, printSyncSummary } from "./core/sync";
 import { runInit } from "./core/init";
 import { runPush } from "./core/push";
-import type { InstallOptions, BackupEntry, SyncOptions } from "./types";
+import { runAudit, printAuditResults } from "./core/audit";
+import type { InstallOptions, BackupEntry, SyncOptions, AuditOptions } from "./types";
 import pkg from "../package.json";
 
 const VERSION = pkg.version;
@@ -45,6 +46,7 @@ ${"\x1b[1m"}COMMANDS${"\x1b[0m"}
   backup list      List all backup files
   backup restore   Restore a specific backup file
   backup clean     Remove old backups based on retention policy
+  audit            Analyze dotfiles repo structure and completeness
   doctor           Check dotfiles health and diagnose issues
 
 ${"\x1b[1m"}OPTIONS${"\x1b[0m"}
@@ -56,6 +58,7 @@ ${"\x1b[1m"}OPTIONS${"\x1b[0m"}
   -q, --quiet          Suppress output (sync command)
   --skip-update        Skip paw binary update check (sync command)
   --auto-update        Auto-update paw without prompting (sync command)
+  --json               Output as JSON (audit command)
   -h, --help           Show this help message
   --version            Show version number
 
@@ -519,6 +522,24 @@ async function doctorCommand(options: InstallOptions): Promise<void> {
 }
 
 /**
+ * Audit command - analyze dotfiles repo
+ */
+async function auditCommand(options: AuditOptions & { verbose: boolean }): Promise<void> {
+  const repoDir = getRepoDir();
+
+  // Try to load config, but don't fail if it doesn't exist
+  let config;
+  try {
+    config = await loadConfig();
+  } catch {
+    // Config might not exist, that's ok - audit will flag it
+  }
+
+  const result = await runAudit(repoDir, config, options);
+  printAuditResults(result, options);
+}
+
+/**
  * Main entry point
  */
 async function main(): Promise<void> {
@@ -533,6 +554,7 @@ async function main(): Promise<void> {
       "quiet": { type: "boolean", short: "q", default: false },
       "skip-update": { type: "boolean", default: false },
       "auto-update": { type: "boolean", default: false },
+      "json": { type: "boolean", default: false },
       "help": { type: "boolean", short: "h", default: false },
       "version": { type: "boolean", default: false },
     },
@@ -628,6 +650,15 @@ async function main(): Promise<void> {
       case "doctor":
         await doctorCommand(options);
         break;
+
+      case "audit": {
+        const auditOptions: AuditOptions & { verbose: boolean } = {
+          verbose: values.verbose as boolean,
+          json: values.json as boolean,
+        };
+        await auditCommand(auditOptions);
+        break;
+      }
 
       case "help":
         printHelp();
