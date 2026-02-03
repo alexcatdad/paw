@@ -6,7 +6,9 @@
 import { $ } from "bun";
 import { logger } from "./logger";
 import { getPlatform, getArch, getHomeDir, commandExists } from "./os";
-import type { UpdateState, GitHubRelease, InstallOptions } from "../types";
+import { loadConfig } from "./config";
+import { createHookContext, runHook } from "./hooks";
+import type { UpdateState, GitHubRelease, InstallOptions, UpdateHookContext } from "../types";
 import pkg from "../../package.json";
 
 const REPO = "alexcatdad/paw";
@@ -217,6 +219,19 @@ export async function performUpdate(options: InstallOptions): Promise<boolean> {
 
   logger.info(`Update available: v${currentVersion} → v${latestVersion}`);
 
+  // Load config for hooks
+  let config;
+  try {
+    config = await loadConfig();
+  } catch {
+    // Config might not exist, that's ok
+  }
+
+  // Run preUpdate hook
+  if (config?.hooks?.preUpdate) {
+    await runHook(config, "preUpdate", createHookContext(options.dryRun));
+  }
+
   if (options.dryRun) {
     logger.info("Dry run - no changes made");
     return true;
@@ -273,6 +288,16 @@ export async function performUpdate(options: InstallOptions): Promise<boolean> {
       latestVersion,
       currentVersion: latestVersion,
     });
+
+    // Run postUpdate hook
+    if (config?.hooks?.postUpdate) {
+      const updateContext: UpdateHookContext = {
+        ...createHookContext(options.dryRun),
+        previousVersion: currentVersion,
+        newVersion: latestVersion,
+      };
+      await runHook(config, "postUpdate", updateContext);
+    }
 
     logger.success(`Updated to v${latestVersion}!`);
     return true;
