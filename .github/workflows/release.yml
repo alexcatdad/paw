@@ -12,6 +12,8 @@ jobs:
     if: startsWith(github.event.release.tag_name, 'v') && github.event.release.tag_name != 'latest'
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +35,11 @@ jobs:
           bun build src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/paw-darwin-x64
           bun build src/index.ts --compile --target=bun-linux-x64 --outfile=dist/paw-linux-x64
           bun build src/index.ts --compile --target=bun-linux-arm64 --outfile=dist/paw-linux-arm64
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/paw-*'
 
       - name: Upload binaries to release
         uses: softprops/action-gh-release@v1
