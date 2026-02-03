@@ -164,3 +164,49 @@ export interface PawConfig {
   /** Remote URL of the dotfiles repository */
   repoUrl: string;
 }
+
+// ============================================================================
+// Audit Types (for paw audit command)
+// ============================================================================
+
+export type AuditSeverity = "error" | "warning" | "info" | "suggestion";
+
+export interface AuditFinding {
+  /** Severity level of the finding */
+  severity: AuditSeverity;
+  /** Category of the finding */
+  category: "structure" | "naming" | "missing" | "convention";
+  /** Human-readable message */
+  message: string;
+  /** File or directory path related to finding (if applicable) */
+  path?: string;
+  /** Suggested fix or action */
+  suggestion?: string;
+}
+
+export interface AuditResult {
+  /** Timestamp of the audit */
+  timestamp: string;
+  /** Path to the audited repository */
+  repoPath: string;
+  /** All findings from the audit */
+  findings: AuditFinding[];
+  /** Summary counts by severity */
+  summary: {
+    errors: number;
+    warnings: number;
+    info: number;
+    suggestions: number;
+  };
+  /** Score from 0-100 representing repo completeness */
+  score: number;
+}
+
+export interface AuditOptions {
+  /** Show verbose output */
+  verbose: boolean;
+  /** Output as JSON instead of formatted text */
+  json: boolean;
+  /** Only show findings of this severity or higher */
+  minSeverity?: AuditSeverity;
+}
