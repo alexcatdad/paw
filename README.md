@@ -5,6 +5,10 @@ Personal dotfiles manager CLI built with TypeScript and Bun.
 > [!CAUTION]
 > ## A BIG ASS WARNING
 >
+> **FORK THIS REPO. DON'T USE MINE.**
+>
+> This is my personal tool. You should **fork it** and make it your own. I may push breaking changes, remove features, or abandon it entirely. If you rely on my repo directly, that's on you.
+>
 > **USE AT YOUR OWN RISK.**
 >
 > This tool makes potentially **destructive changes** to your home directory:
@@ -20,9 +24,16 @@ Personal dotfiles manager CLI built with TypeScript and Bun.
 
 ## Installation
 
+**Step 1: Fork this repo** (seriously, do it)
+
+**Step 2: Update the install script URL to point to YOUR fork:**
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alexcatdad/paw/main/install.sh | bash
+# Replace YOUR_USERNAME with your GitHub username
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paw/main/install.sh | bash
 ```
+
+You'll also need to update the `REPO` constant in `src/core/update.ts` to point to your fork for self-updates to work.
 
 ## Quick Start
 
