@@ -48,6 +48,27 @@ export interface HookContext {
   commandExists: (cmd: string) => Promise<boolean>;
 }
 
+export interface SyncHookContext extends HookContext {
+  /** Files changed during sync */
+  filesChanged: string[];
+  /** Whether symlinks were refreshed */
+  linksRefreshed: boolean;
+}
+
+export interface PushHookContext extends HookContext {
+  /** Commit hash after push */
+  commitHash: string;
+  /** Files that were committed */
+  filesCommitted: string[];
+}
+
+export interface UpdateHookContext extends HookContext {
+  /** Version before update */
+  previousVersion: string;
+  /** Version after update */
+  newVersion: string;
+}
+
 export interface DotfilesConfig {
   /** Symlink mappings: source (relative to config/) -> target (relative to $HOME) */
   symlinks: Record<string, SymlinkTarget>;
@@ -61,10 +82,24 @@ export interface DotfilesConfig {
   backup?: BackupConfig;
   /** Lifecycle hooks */
   hooks?: {
+    // Install lifecycle
     preInstall?: (ctx: HookContext) => Promise<void>;
     postInstall?: (ctx: HookContext) => Promise<void>;
+    // Link lifecycle
     preLink?: (ctx: HookContext) => Promise<void>;
     postLink?: (ctx: HookContext) => Promise<void>;
+    // Sync lifecycle
+    preSync?: (ctx: HookContext) => Promise<void>;
+    postSync?: (ctx: SyncHookContext) => Promise<void>;
+    // Push lifecycle
+    prePush?: (ctx: HookContext) => Promise<void>;
+    postPush?: (ctx: PushHookContext) => Promise<void>;
+    // Update lifecycle
+    preUpdate?: (ctx: HookContext) => Promise<void>;
+    postUpdate?: (ctx: UpdateHookContext) => Promise<void>;
+    // Rollback lifecycle
+    preRollback?: (ctx: HookContext) => Promise<void>;
+    postRollback?: (ctx: HookContext) => Promise<void>;
   };
 }
 
