@@ -19,3 +19,6 @@ coverage/
 # Environment
 .env
 .env.local
+
+# Worktrees
+.worktrees/
