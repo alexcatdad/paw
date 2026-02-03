@@ -125,6 +125,8 @@ export interface InstallOptions {
   verbose: boolean;
   /** Skip package installation */
   skipPackages: boolean;
+  /** Disable interactive prompts */
+  noInteractive?: boolean;
 }
 
 export interface BackupEntry {

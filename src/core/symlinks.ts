@@ -9,6 +9,7 @@ import type { SymlinkState, InstallOptions, SymlinkEntry, SymlinkTarget, Symlink
 import { logger } from "./logger";
 import { getHomeDir, contractPath, validatePathWithinBase, getPlatform, matchGlob, getHostname } from "./os";
 import { resolveConfigPath } from "./config";
+import { isInteractive, promptConflict, type ConflictChoice } from "./prompt";
 
 /**
  * Check if a symlink should be created based on conditions
@@ -87,8 +88,9 @@ async function createBackup(filePath: string): Promise<string> {
 async function createSymlink(
   source: string,
   target: string,
-  options: InstallOptions
-): Promise<SymlinkState> {
+  options: InstallOptions,
+  pendingChoice?: ConflictChoice
+): Promise<{ state: SymlinkState; nextChoice?: ConflictChoice }> {
   const state: SymlinkState = {
     source,
     target,
@@ -101,7 +103,7 @@ async function createSymlink(
   } catch {
     logger.error(`Source file not found: ${contractPath(source)}`);
     state.status = "source-missing";
-    return state;
+    return { state };
   }
 
   // Check if target already exists
@@ -114,27 +116,74 @@ async function createSymlink(
     if (isCorrectLink) {
       logger.skip(`${contractPath(target)} (already linked)`);
       state.status = "linked";
-      return state;
+      return { state };
     }
 
     // Handle conflict
-    if (!options.force) {
-      logger.warn(`Conflict: ${contractPath(target)} exists (use --force to backup and replace)`);
-      state.status = "conflict";
-      return state;
+    let choice: ConflictChoice | undefined = pendingChoice;
+
+    if (!choice) {
+      if (options.force) {
+        choice = { action: "backup" };
+      } else if (options.noInteractive || !isInteractive()) {
+        logger.warn(`Conflict: ${contractPath(target)} exists (use --force to backup and replace)`);
+        state.status = "conflict";
+        return { state };
+      } else {
+        // Interactive prompt
+        choice = await promptConflict(target, source);
+      }
     }
 
-    // Create backup
-    if (options.dryRun) {
-      logger.dryRun(`Would backup ${contractPath(target)}`);
-    } else {
-      const backupPath = await createBackup(target);
-      logger.info(`Backed up ${contractPath(target)} to ${contractPath(backupPath)}`);
-      state.backupPath = backupPath;
+    // Handle the choice
+    switch (choice.action) {
+      case "abort":
+        throw new Error("Aborted by user");
+
+      case "skip":
+        logger.skip(`${contractPath(target)} (skipped by user)`);
+        state.status = "conflict";
+        return { state, nextChoice: choice.applyToAll ? choice : undefined };
+
+      case "overwrite":
+        if (options.dryRun) {
+          logger.dryRun(`Would overwrite ${contractPath(target)} (no backup)`);
+        } else {
+          await unlink(target);
+          logger.info(`Removed ${contractPath(target)} (no backup)`);
+        }
+        break;
+
+      case "backup":
+        if (options.dryRun) {
+          logger.dryRun(`Would backup ${contractPath(target)}`);
+        } else {
+          const backupPath = await createBackup(target);
+          logger.info(`Backed up ${contractPath(target)} to ${contractPath(backupPath)}`);
+          state.backupPath = backupPath;
+        }
+        state.status = "backup";
+        break;
     }
-    state.status = "backup";
+
+    // Pass along applyToAll choice
+    if (choice.applyToAll) {
+      return { state: await finishSymlink(source, target, state, options), nextChoice: choice };
+    }
   }
 
+  return { state: await finishSymlink(source, target, state, options) };
+}
+
+/**
+ * Complete symlink creation after conflict handling
+ */
+async function finishSymlink(
+  source: string,
+  target: string,
+  state: SymlinkState,
+  options: InstallOptions
+): Promise<SymlinkState> {
   // Create parent directories
   const targetDir = dirname(target);
   if (options.dryRun) {
@@ -146,7 +195,10 @@ async function createSymlink(
     logger.link(contractPath(source), contractPath(target));
   }
 
-  state.status = "linked";
+  // Only set to linked if not already marked as backup
+  if (state.status !== "backup") {
+    state.status = "linked";
+  }
   return state;
 }
 
@@ -159,6 +211,7 @@ export async function createSymlinks(
 ): Promise<SymlinkState[]> {
   const homeDir = getHomeDir();
   const states: SymlinkState[] = [];
+  let pendingChoice: ConflictChoice | undefined;
 
   for (const [sourceRel, targetConfig] of Object.entries(symlinks)) {
     const { targetPath, condition } = normalizeSymlinkTarget(targetConfig);
@@ -172,7 +225,7 @@ export async function createSymlinks(
       states.push({
         source,
         target,
-        status: "missing", // Use missing for skipped conditional symlinks
+        status: "missing",
       });
       continue;
     }
@@ -180,8 +233,12 @@ export async function createSymlinks(
     // Security: Prevent path traversal attacks
     validatePathWithinBase(target, homeDir, "Symlink target");
 
-    const state = await createSymlink(source, target, options);
+    const { state, nextChoice } = await createSymlink(source, target, options, pendingChoice);
     states.push(state);
+
+    if (nextChoice) {
+      pendingChoice = nextChoice;
+    }
   }
 
   return states;
