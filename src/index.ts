@@ -56,6 +56,7 @@ ${"\x1b[1m"}OPTIONS${"\x1b[0m"}
   -f, --force          Overwrite existing files (creates backups)
   -v, --verbose        Show detailed output
   --skip-packages      Skip package installation (install command only)
+  --no-interactive     Disable interactive prompts (skip conflicts)
   -p, --path <path>    Clone path for init command (default: ~/dotfiles)
   -q, --quiet          Suppress output (sync command)
   --skip-update        Skip paw binary update check (sync command)
@@ -587,6 +588,7 @@ async function main(): Promise<void> {
       "skip-update": { type: "boolean", default: false },
       "auto-update": { type: "boolean", default: false },
       "json": { type: "boolean", default: false },
+      "no-interactive": { type: "boolean", default: false },
       "help": { type: "boolean", short: "h", default: false },
       "version": { type: "boolean", default: false },
     },
@@ -613,6 +615,7 @@ async function main(): Promise<void> {
     force: values.force as boolean,
     verbose: values.verbose as boolean,
     skipPackages: values["skip-packages"] as boolean,
+    noInteractive: values["no-interactive"] as boolean,
   };
 
   try {
