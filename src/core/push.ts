@@ -6,13 +6,23 @@
 import { $ } from "bun";
 import { logger } from "./logger";
 import { getDotfilesPath } from "./paw-config";
-import type { InstallOptions } from "../types";
+import { loadConfig } from "./config";
+import { createHookContext, runHook } from "./hooks";
+import type { InstallOptions, PushHookContext } from "../types";
 
 /**
  * Push dotfiles changes to remote
  */
 export async function runPush(message: string | undefined, options: InstallOptions): Promise<boolean> {
   const repoPath = await getDotfilesPath();
+
+  // Load config for hooks
+  let config;
+  try {
+    config = await loadConfig();
+  } catch {
+    // Config might not exist, that's ok
+  }
 
   // Check for changes
   const statusResult = await $`git -C ${repoPath} status --porcelain`.quiet().nothrow();
@@ -29,8 +39,8 @@ export async function runPush(message: string | undefined, options: InstallOptio
   }
 
   // Show what will be committed
-  const changedFiles = changes.split("\n").length;
-  logger.info(`${changedFiles} file(s) changed`);
+  const changedFileLines = changes.split("\n");
+  logger.info(`${changedFileLines.length} file(s) changed`);
 
   if (options.verbose) {
     logger.newline();
@@ -41,6 +51,11 @@ export async function runPush(message: string | undefined, options: InstallOptio
   if (options.dryRun) {
     logger.info("Would stage, commit, and push changes");
     return true;
+  }
+
+  // Run prePush hook
+  if (config?.hooks?.prePush) {
+    await runHook(config, "prePush", createHookContext(options.dryRun));
   }
 
   // Generate commit message if not provided
@@ -78,5 +93,20 @@ export async function runPush(message: string | undefined, options: InstallOptio
   }
 
   logger.success(`Pushed: ${commitMessage}`);
+
+  // Get commit hash
+  const hashResult = await $`git -C ${repoPath} rev-parse HEAD`.quiet().nothrow();
+  const commitHash = hashResult.exitCode === 0 ? hashResult.text().trim() : "unknown";
+
+  // Run postPush hook
+  if (config?.hooks?.postPush) {
+    const pushContext: PushHookContext = {
+      ...createHookContext(options.dryRun),
+      commitHash,
+      filesCommitted: changedFileLines.map(line => line.slice(3)), // Remove status prefix
+    };
+    await runHook(config, "postPush", pushContext);
+  }
+
   return true;
 }
