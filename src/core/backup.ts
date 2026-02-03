@@ -6,6 +6,8 @@
 import { readdir, stat, unlink, rename } from "node:fs/promises";
 import { resolve, dirname, basename } from "node:path";
 import type { BackupEntry, LastRunState, BackupConfig, InstallOptions } from "../types";
+import { loadConfig } from "./config";
+import { createHookContext, runHook } from "./hooks";
 import { logger } from "./logger";
 import { getHomeDir, contractPath, validatePathWithinBase } from "./os";
 
@@ -249,6 +251,19 @@ export async function rollback(options: InstallOptions): Promise<boolean> {
     return false;
   }
 
+  // Load config for hooks
+  let config;
+  try {
+    config = await loadConfig();
+  } catch {
+    // Config might not exist, that's ok
+  }
+
+  // Run preRollback hook
+  if (config?.hooks?.preRollback) {
+    await runHook(config, "preRollback", createHookContext(options.dryRun));
+  }
+
   logger.header("Rolling Back");
   logger.info(`Last run: ${lastRun.command} at ${lastRun.timestamp}`);
 
@@ -291,6 +306,11 @@ export async function rollback(options: InstallOptions): Promise<boolean> {
     } catch {
       // File doesn't exist, that's fine
     }
+  }
+
+  // Run postRollback hook
+  if (config?.hooks?.postRollback) {
+    await runHook(config, "postRollback", createHookContext(options.dryRun));
   }
 
   logger.newline();
