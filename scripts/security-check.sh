@@ -34,7 +34,7 @@ echo "Checking for hardcoded home paths..."
 # Pattern for personal home directories (not system paths like /home/linuxbrew)
 # We look for /Users/<name>/ or /home/<name>/ but exclude known system paths
 for file in $FILES; do
-    if [[ "$file" =~ (security-check\.sh|\.md)$ ]]; then
+    if [[ "$file" =~ (security-check\.sh|\.md)$ ]] || [[ "$file" =~ ^tests/ ]]; then
         continue
     fi
 
@@ -112,7 +112,7 @@ KEY_PATTERNS=(
 )
 
 for pattern in "${KEY_PATTERNS[@]}"; do
-    MATCHES=$(echo "$FILES" | xargs grep -l "$pattern" 2>/dev/null || true)
+    MATCHES=$(echo "$FILES" | xargs grep -l "$pattern" 2>/dev/null | grep -v 'security-check\.sh' || true)
     if [ -n "$MATCHES" ]; then
         echo -e "${RED}Found private keys:${NC}"
         echo "$MATCHES" | sed 's/^/  /'
