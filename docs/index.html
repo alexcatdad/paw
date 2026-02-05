@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>paw — personal dotfiles manager</title>
+  <meta name="description" content="CLI tool for managing dotfiles across machines. Fork it. Own it.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        fontFamily: {
+          mono: ["ui-monospace", "'Cascadia Code'", "'Source Code Pro'", "Menlo", "Consolas", "monospace"],
+        },
+        extend: {
+          colors: {
+            term: {
+              bg: '#0a0a0a',
+              fg: '#e0e0e0',
+              green: '#4ade80',
+              red: '#f87171',
+              yellow: '#facc15',
+              blue: '#60a5fa',
+              cyan: '#22d3ee',
+              magenta: '#c084fc',
+              gray: '#8b8fa3',
+              dim: '#9ca3af',
+              border: '#e0e0e0',
+              accent: '#4ade80',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    @media (prefers-reduced-motion: no-preference) {
+      html { scroll-behavior: smooth; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cursor { animation: none; opacity: 1; }
+    }
+
+    body {
+      font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      margin: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .border-brutal {
+      border: 3px solid #e0e0e0;
+    }
+
+    .border-brutal-thin {
+      border: 1px solid #e0e0e0;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 0.6em;
+      height: 1.2em;
+      background: #4ade80;
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes flash {
+      0% { background: #4ade80; color: #0a0a0a; }
+      100% { background: transparent; color: #e0e0e0; }
+    }
+
+    .copied {
+      animation: flash 0.6s ease-out;
+    }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0a0a; }
+    ::-webkit-scrollbar-thumb { background: #e0e0e0; }
+
+    ::selection {
+      background: #4ade80;
+      color: #0a0a0a;
+    }
+
+    terminal-demo {
+      display: block;
+    }
+  </style>
+</head>
+<body class="font-mono">
+
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-term-accent focus:text-term-bg focus:px-4 focus:py-2 focus:z-50">Skip to main content</a>
+
+  <!-- HERO -->
+  <header class="min-h-[70vh] flex flex-col justify-center px-6 md:px-16 lg:px-24 py-16">
+    <div class="max-w-4xl">
+      <h1 class="text-6xl md:text-8xl lg:text-9xl font-bold text-term-fg leading-none tracking-tighter mb-8">
+        paw
+      </h1>
+      <p class="text-xl md:text-2xl text-term-dim mb-4">
+        personal dotfiles manager
+      </p>
+      <p class="text-base text-term-gray mb-12 max-w-xl leading-relaxed">
+        CLI tool for managing dotfiles across machines with automatic synchronization,
+        package installation, and symlink management. Built with TypeScript and Bun.
+      </p>
+
+      <div class="mb-8">
+        <p class="text-xs text-term-gray uppercase tracking-widest mb-3">Install</p>
+        <code-block copyable="true">curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paw/main/install.sh | bash</code-block>
+      </div>
+
+      <div class="flex gap-4 flex-wrap">
+        <a href="https://github.com/alexcatdad/paw" class="border-brutal px-6 py-3 text-sm text-term-fg hover:bg-term-fg hover:text-term-bg transition-colors duration-100 inline-block no-underline">
+          GitHub &rarr;
+        </a>
+        <a href="#demo" class="border-brutal-thin px-6 py-3 text-sm text-term-gray hover:text-term-fg hover:border-term-fg transition-colors duration-100 inline-block no-underline">
+          See it in action &darr;
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
+
+  <!-- WARNING -->
+  <section id="main" class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="warning-heading">
+    <div class="max-w-4xl border-brutal p-8 md:p-12 bg-term-bg" role="alert">
+      <h2 id="warning-heading" class="text-2xl md:text-3xl font-bold text-term-yellow mb-4">A BIG ASS WARNING</h2>
+      <p class="text-term-fg mb-4 leading-relaxed">
+        <strong>FORK THIS REPO. DON'T USE MINE.</strong>
+      </p>
+      <p class="text-term-dim leading-relaxed mb-4">
+        This is my personal tool. You should fork it and make it your own.
+        I may push breaking changes, remove features, or abandon it entirely.
+      </p>
+      <p class="text-term-dim leading-relaxed">
+        This tool makes potentially <span class="text-term-red">destructive changes</span> to your home directory:
+        creates symlinks, executes arbitrary code from your config, installs packages,
+        and self-updates by downloading binaries.
+        <span class="text-term-yellow">You have been warned.</span>
+      </p>
+    </div>
+  </section>
+
+  <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
+
+  <!-- TERMINAL DEMO -->
+  <section id="demo" class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="demo-heading">
+    <h2 id="demo-heading" class="text-xs text-term-gray uppercase tracking-widest mb-6">Live Demo</h2>
+    <terminal-demo></terminal-demo>
+  </section>
+
+  <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
+
+  <!-- FEATURES -->
+  <section class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="features-heading">
+    <h2 id="features-heading" class="text-xs text-term-gray uppercase tracking-widest mb-8">What it does</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-0 max-w-4xl border-brutal">
+      <feature-card
+        title="SYMLINK MANAGEMENT"
+        description="Declarative symlinks from your dotfiles repo to ~. Backs up originals before overwriting. Dry-run to preview."
+      ></feature-card>
+      <feature-card
+        title="CROSS-MACHINE SYNC"
+        description="Push from one machine, auto-pull on another. Add 'paw sync --quiet' to your .zshrc for seamless syncing on shell startup."
+      ></feature-card>
+      <feature-card
+        title="PACKAGE INSTALLATION"
+        description="Declare packages per-platform. Homebrew on macOS, apt on Linux. Common packages shared across both."
+      ></feature-card>
+      <feature-card
+        title="AUDIT &amp; SCAFFOLD"
+        description="Score your dotfiles completeness. Detect missing configs. Generate templates for common tools you haven't set up yet."
+      ></feature-card>
+      <feature-card
+        title="BACKUP &amp; ROLLBACK"
+        description="Every overwrite is backed up. Roll back the last run with one command. Configurable retention and max count."
+      ></feature-card>
+      <feature-card
+        title="LIFECYCLE HOOKS"
+        description="preInstall, postInstall, prePush, postPush, preUpdate, postUpdate, preRollback, postRollback. Full control."
+      ></feature-card>
+    </div>
+  </section>
+
+  <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
+
+  <!-- CONFIG EXAMPLE -->
+  <section class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="config-heading">
+    <h2 id="config-heading" class="text-xs text-term-gray uppercase tracking-widest mb-3">Configuration</h2>
+    <p class="text-term-dim text-sm mb-6">dotfiles.config.ts in your repo</p>
+    <div class="max-w-4xl">
+      <code-block>import type { DotfilesConfig } from "paw";
+
+export default {
+  symlinks: {
+    "shell/zshrc": ".zshrc",
+    "git/gitconfig": ".gitconfig",
+    "starship/starship.toml": ".config/starship.toml",
+  },
+  packages: {
+    common: ["starship", "eza", "fzf", "zoxide", "ripgrep"],
+    darwin: ["coreutils"],
+    linux: { apt: ["build-essential"], brew: ["gcc"] },
+  },
+  hooks: {
+    postInstall: async (ctx) =&gt; {
+      console.log("dotfiles installed on", ctx.platform);
+    },
+  },
+} satisfies DotfilesConfig;</code-block>
+    </div>
+  </section>
+
+  <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
+
+  <!-- COMMANDS -->
+  <section class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="commands-heading">
+    <h2 id="commands-heading" class="text-xs text-term-gray uppercase tracking-widest mb-8">Commands</h2>
+    <dl class="max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-0 text-sm">
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw init &lt;repo&gt;</dt>
+        <dd class="text-term-dim m-0">Clone and setup</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw install</dt>
+        <dd class="text-term-dim m-0">Packages + symlinks</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw link</dt>
+        <dd class="text-term-dim m-0">Symlinks only</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw unlink</dt>
+        <dd class="text-term-dim m-0">Remove symlinks</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw sync</dt>
+        <dd class="text-term-dim m-0">Pull and refresh</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw push [msg]</dt>
+        <dd class="text-term-dim m-0">Commit and push</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw status</dt>
+        <dd class="text-term-dim m-0">Current state</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw audit</dt>
+        <dd class="text-term-dim m-0">Repo analysis</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw scaffold</dt>
+        <dd class="text-term-dim m-0">Generate configs</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw doctor</dt>
+        <dd class="text-term-dim m-0">Health check</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw update</dt>
+        <dd class="text-term-dim m-0">Self-update</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw rollback</dt>
+        <dd class="text-term-dim m-0">Restore backups</dd>
+      </div>
+    </dl>
+  </section>
+
+  <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
+
+  <!-- FOOTER -->
+  <footer class="px-6 md:px-16 lg:px-24 py-16">
+    <div class="max-w-4xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <p class="text-term-dim text-sm">MIT License</p>
+        <p class="text-term-gray text-xs mt-1">Fork it. Own it. Break it. Fix it.</p>
+      </div>
+      <a href="https://github.com/alexcatdad/paw" class="text-term-accent text-sm hover:text-term-fg transition-colors no-underline">
+        github.com/alexcatdad/paw
+      </a>
+    </div>
+  </footer>
+
+  <!-- WEB COMPONENTS -->
+  <script>
+    // ─── Helper: create a text node safely ──────
+    function safeSpan(text, style) {
+      const span = document.createElement('span');
+      span.textContent = text;
+      if (style) span.style.cssText = style;
+      return span;
+    }
+
+    // ─── <code-block> ───────────────────────────
+    class CodeBlock extends HTMLElement {
+      connectedCallback() {
+        const code = this.textContent.trim();
+        this.textContent = '';
+        const copyable = this.getAttribute('copyable') === 'true';
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position:relative; background:#111; border:3px solid #e0e0e0; padding:16px 20px; overflow-x:auto;';
+
+        const pre = document.createElement('pre');
+        pre.style.cssText = 'margin:0; white-space:pre; font-size:14px; line-height:1.6; color:#e0e0e0; font-family:inherit;';
+        pre.textContent = code;
+        wrapper.appendChild(pre);
+
+        if (copyable) {
+          const btn = document.createElement('button');
+          btn.textContent = 'COPY';
+          btn.setAttribute('aria-label', 'Copy code to clipboard');
+          btn.style.cssText = 'position:absolute; top:8px; right:8px; background:none; border:1px solid #8b8fa3; color:#8b8fa3; padding:2px 8px; font-family:inherit; font-size:11px; cursor:pointer; letter-spacing:0.05em;';
+          btn.addEventListener('mouseenter', () => { btn.style.borderColor = '#e0e0e0'; btn.style.color = '#e0e0e0'; });
+          btn.addEventListener('mouseleave', () => { btn.style.borderColor = '#8b8fa3'; btn.style.color = '#8b8fa3'; });
+
+          const status = document.createElement('span');
+          status.setAttribute('role', 'status');
+          status.setAttribute('aria-live', 'polite');
+          status.className = 'sr-only';
+          wrapper.appendChild(status);
+
+          btn.addEventListener('click', () => {
+            navigator.clipboard.writeText(code).then(() => {
+              btn.textContent = 'COPIED';
+              btn.classList.add('copied');
+              status.textContent = 'Code copied to clipboard';
+              setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); status.textContent = ''; }, 1500);
+            });
+          });
+          wrapper.appendChild(btn);
+        }
+
+        this.appendChild(wrapper);
+      }
+    }
+    customElements.define('code-block', CodeBlock);
+
+    // ─── <feature-card> ─────────────────────────
+    class FeatureCard extends HTMLElement {
+      connectedCallback() {
+        const title = this.getAttribute('title') || '';
+        const desc = this.getAttribute('description') || '';
+
+        const card = document.createElement('div');
+        card.style.cssText = 'padding:24px 28px; border-bottom:1px solid #e0e0e0; border-right:1px solid #e0e0e0;';
+
+        const h = document.createElement('p');
+        h.textContent = title;
+        h.style.cssText = 'margin:0 0 8px 0; font-size:13px; font-weight:700; color:#e0e0e0; letter-spacing:0.08em;';
+
+        const p = document.createElement('p');
+        p.textContent = desc;
+        p.style.cssText = 'margin:0; font-size:13px; color:#9ca3af; line-height:1.5;';
+
+        card.appendChild(h);
+        card.appendChild(p);
+        this.appendChild(card);
+      }
+    }
+    customElements.define('feature-card', FeatureCard);
+
+    // ─── <terminal-demo> ────────────────────────
+    class TerminalDemo extends HTMLElement {
+      constructor() {
+        super();
+        this.scenes = [
+          {
+            cmd: 'paw status',
+            lines: [
+              { text: '', type: 'blank' },
+              { text: '\u2550\u2550\u2550 Dotfiles Status \u2550\u2550\u2550', type: 'header' },
+              { text: '', type: 'blank' },
+              { text: '  Repository  ~/dotfiles', type: 'table' },
+              { text: '  Branch      main (clean)', type: 'table' },
+              { text: '', type: 'blank' },
+              { text: '\u2500\u2500\u2500 Symlinks \u2500\u2500\u2500', type: 'subheader' },
+              { text: '', type: 'blank' },
+              { pre: '\u2713', suf: ' shell/zshrc        \u2192 ~/.zshrc', type: 'success' },
+              { pre: '\u2713', suf: ' git/gitconfig      \u2192 ~/.gitconfig', type: 'success' },
+              { pre: '\u2713', suf: ' starship.toml      \u2192 ~/.config/starship.toml', type: 'success' },
+              { text: '\u25CB tmux.conf          \u2192 ~/.tmux.conf (skipped)', type: 'skip' },
+              { text: '', type: 'blank' },
+              { text: '\u2500\u2500\u2500 Packages \u2500\u2500\u2500', type: 'subheader' },
+              { text: '', type: 'blank' },
+              { pre: '\u2713', suf: ' starship eza fzf zoxide ripgrep', type: 'success' },
+              { pre: '\u26A0', suf: ' coreutils (not installed)', type: 'warn' },
+            ],
+          },
+          {
+            cmd: 'paw audit',
+            lines: [
+              { text: '', type: 'blank' },
+              { text: '\u2550\u2550\u2550 Dotfiles Audit \u2550\u2550\u2550', type: 'header' },
+              { text: '', type: 'blank' },
+              { text: '  Repository  ~/dotfiles', type: 'table' },
+              { text: '  Score       75/100', type: 'table' },
+              { text: '', type: 'blank' },
+              { text: '\u2500\u2500\u2500 Missing \u2500\u2500\u2500', type: 'subheader' },
+              { text: '', type: 'blank' },
+              { pre: '\u26A0', suf: ' Missing SSH Config: SSH configuration and keys setup', type: 'warn' },
+              { pre: '\u2192', suf: ' Missing Tmux: Terminal multiplexer configuration', type: 'info' },
+              { text: '', type: 'blank' },
+              { text: '\u2500\u2500\u2500 Summary \u2500\u2500\u2500', type: 'subheader' },
+              { text: '', type: 'blank' },
+              { text: '  Errors       0', type: 'table' },
+              { text: '  Warnings     1', type: 'table' },
+              { text: '  Suggestions  1', type: 'table' },
+            ],
+          },
+          {
+            cmd: 'paw install --dry-run',
+            lines: [
+              { text: '', type: 'blank' },
+              { text: '\u2550\u2550\u2550 Install (dry-run) \u2550\u2550\u2550', type: 'header' },
+              { text: '', type: 'blank' },
+              { text: '\u2500\u2500\u2500 Packages \u2500\u2500\u2500', type: 'subheader' },
+              { text: '', type: 'blank' },
+              { pre: '\u25CC [dry-run]', suf: ' Would install: coreutils', type: 'dryrun' },
+              { text: '', type: 'blank' },
+              { text: '\u2500\u2500\u2500 Symlinks \u2500\u2500\u2500', type: 'subheader' },
+              { text: '', type: 'blank' },
+              { pre: '\u25CC [dry-run]', suf: ' Would link shell/zshrc \u2192 ~/.zshrc', type: 'dryrun' },
+              { pre: '\u25CC [dry-run]', suf: ' Would link git/gitconfig \u2192 ~/.gitconfig', type: 'dryrun' },
+              { pre: '\u25CC [dry-run]', suf: ' Would link starship.toml \u2192 ~/.config/starship.toml', type: 'dryrun' },
+              { text: '', type: 'blank' },
+              { text: '\u2500\u2500\u2500 Summary \u2500\u2500\u2500', type: 'subheader' },
+              { text: '', type: 'blank' },
+              { text: '  Packages   1 to install', type: 'table' },
+              { text: '  Symlinks   3 to create', type: 'table' },
+              { text: '  Backups    2 files would be backed up', type: 'table' },
+            ],
+          },
+        ];
+        this.currentScene = 0;
+        this.aborted = false;
+      }
+
+      connectedCallback() {
+        this.wrapper = document.createElement('div');
+        this.wrapper.setAttribute('role', 'img');
+        this.wrapper.setAttribute('aria-label', 'Animated terminal demo cycling through paw status, paw audit, and paw install --dry-run commands showing colored CLI output');
+        this.wrapper.style.cssText = 'border:3px solid #e0e0e0; background:#111; max-width:56rem;';
+
+        // Title bar
+        const titleBar = document.createElement('div');
+        titleBar.style.cssText = 'border-bottom:1px solid #e0e0e0; padding:8px 16px; display:flex; justify-content:space-between; align-items:center;';
+
+        const titleText = document.createElement('span');
+        titleText.textContent = 'terminal';
+        titleText.style.cssText = 'font-size:12px; color:#8b8fa3; letter-spacing:0.05em;';
+
+        this.sceneCounter = document.createElement('span');
+        this.sceneCounter.style.cssText = 'font-size:11px; color:#8b8fa3;';
+        this.updateCounter();
+
+        titleBar.appendChild(titleText);
+        titleBar.appendChild(this.sceneCounter);
+        this.wrapper.appendChild(titleBar);
+
+        // Output area
+        this.output = document.createElement('div');
+        this.output.style.cssText = 'padding:20px 24px; min-height:320px; font-size:14px; line-height:1.6;';
+        this.wrapper.appendChild(this.output);
+
+        this.appendChild(this.wrapper);
+        this.runLoop();
+      }
+
+      disconnectedCallback() {
+        this.aborted = true;
+      }
+
+      updateCounter() {
+        this.sceneCounter.textContent = (this.currentScene + 1) + '/' + this.scenes.length;
+      }
+
+      // Color map for icon prefixes
+      iconColor(type) {
+        const map = {
+          header: '#c084fc',
+          subheader: '#22d3ee',
+          success: '#4ade80',
+          warn: '#facc15',
+          info: '#60a5fa',
+          skip: '#8b8fa3',
+          dryrun: '#22d3ee',
+          table: '#9ca3af',
+        };
+        return map[type] || '#e0e0e0';
+      }
+
+      // Build a DOM line from scene line data — no innerHTML
+      buildLine(line) {
+        const div = document.createElement('div');
+        div.style.cssText = 'min-height:1.6em; white-space:pre;';
+
+        if (line.type === 'blank') {
+          div.appendChild(document.createTextNode('\u00A0'));
+          return div;
+        }
+
+        // Lines with colored prefix + normal suffix
+        if (line.pre !== undefined) {
+          div.appendChild(safeSpan(line.pre, 'color:' + this.iconColor(line.type) + ';'));
+          div.appendChild(safeSpan(line.suf, 'color:#e0e0e0;'));
+          return div;
+        }
+
+        // Full-line colored types
+        if (line.type === 'header') {
+          div.appendChild(safeSpan(line.text, 'color:#c084fc; font-weight:700;'));
+          return div;
+        }
+        if (line.type === 'subheader') {
+          div.appendChild(safeSpan(line.text, 'color:#22d3ee; font-weight:700;'));
+          return div;
+        }
+        if (line.type === 'skip') {
+          div.appendChild(safeSpan(line.text, 'color:#8b8fa3;'));
+          return div;
+        }
+
+        // Table: dim key, normal value
+        if (line.type === 'table') {
+          const match = line.text.match(/^(\s+\S+)(\s+)(.*)/);
+          if (match) {
+            div.appendChild(safeSpan(match[1], 'color:#8b8fa3;'));
+            div.appendChild(safeSpan(match[2]));
+            div.appendChild(safeSpan(match[3], 'color:#e0e0e0;'));
+          } else {
+            div.appendChild(safeSpan(line.text, 'color:#9ca3af;'));
+          }
+          return div;
+        }
+
+        // Default
+        div.appendChild(safeSpan(line.text, 'color:#e0e0e0;'));
+        return div;
+      }
+
+      sleep(ms) {
+        return new Promise(r => setTimeout(r, ms));
+      }
+
+      async typeCommand(cmd) {
+        const promptLine = document.createElement('div');
+        promptLine.style.cssText = 'min-height:1.6em; white-space:pre;';
+        this.output.appendChild(promptLine);
+
+        const dollarSign = safeSpan('$ ', 'color:#4ade80; font-weight:700;');
+        promptLine.appendChild(dollarSign);
+
+        const typedSpan = document.createElement('span');
+        promptLine.appendChild(typedSpan);
+
+        const cursor = document.createElement('span');
+        cursor.className = 'cursor';
+        promptLine.appendChild(cursor);
+
+        for (const char of cmd) {
+          if (this.aborted) return;
+          typedSpan.textContent += char;
+          await this.sleep(40 + Math.random() * 40);
+        }
+
+        // Remove cursor after done typing
+        cursor.remove();
+      }
+
+      async showOutput(lines) {
+        for (const line of lines) {
+          if (this.aborted) return;
+          this.output.appendChild(this.buildLine(line));
+          await this.sleep(line.type === 'blank' ? 30 : 60);
+        }
+      }
+
+      async runLoop() {
+        while (!this.aborted) {
+          const scene = this.scenes[this.currentScene];
+          this.updateCounter();
+          this.output.textContent = '';
+
+          await this.typeCommand(scene.cmd);
+          await this.showOutput(scene.lines);
+          await this.sleep(3000);
+
+          this.currentScene = (this.currentScene + 1) % this.scenes.length;
+        }
+      }
+    }
+    customElements.define('terminal-demo', TerminalDemo);
+  </script>
+
+</body>
+</html>
