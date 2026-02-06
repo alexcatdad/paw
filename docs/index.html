@@ -18,7 +18,7 @@
   <meta property="og:description" content="CLI tool for managing dotfiles across machines with automatic synchronization, package installation, and symlink management.">
   <meta property="og:site_name" content="paw">
   <meta property="og:locale" content="en_US">
-  <meta property="og:image" content="https://alexcatdad.github.io/paw/og-image.svg">
+  <meta property="og:image" content="https://alexcatdad.github.io/paw/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="paw — personal dotfiles manager. CLI tool for managing dotfiles across machines.">
@@ -27,14 +27,11 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="paw — personal dotfiles manager">
   <meta name="twitter:description" content="CLI tool for managing dotfiles across machines with automatic synchronization, package installation, and symlink management.">
-  <meta name="twitter:image" content="https://alexcatdad.github.io/paw/og-image.svg">
+  <meta name="twitter:image" content="https://alexcatdad.github.io/paw/og-image.png">
   <meta name="twitter:image:alt" content="paw — personal dotfiles manager. CLI tool for managing dotfiles across machines.">
 
-  <!-- Favicon & Manifest -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
-  <link rel="manifest" href="manifest.json">
 
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -47,8 +44,7 @@
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux",
     "programmingLanguage": "TypeScript",
-    "image": "https://alexcatdad.github.io/paw/og-image.svg",
-    "screenshot": "https://alexcatdad.github.io/paw/og-image.svg",
+    "image": "https://alexcatdad.github.io/paw/og-image.png",
     "author": {
       "@type": "Person",
       "name": "Alex Alexandrescu",
@@ -63,21 +59,6 @@
     }
   }
   </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {
-        "@type": "ListItem",
-        "position": 1,
-        "name": "paw",
-        "item": "https://alexcatdad.github.io/paw/"
-      }
-    ]
-  }
-  </script>
-
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -170,16 +151,6 @@
 
     /* Keyboard focus indicators (WCAG 2.4.7) */
     :focus-visible {
-      outline: 2px solid #4ade80;
-      outline-offset: 2px;
-    }
-
-    a:focus-visible {
-      outline: 2px solid #4ade80;
-      outline-offset: 2px;
-    }
-
-    button:focus-visible {
       outline: 2px solid #4ade80;
       outline-offset: 2px;
     }
