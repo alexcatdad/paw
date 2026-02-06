@@ -1,0 +1,10 @@
+{
+  "name": "paw",
+  "short_name": "paw",
+  "description": "CLI tool for managing dotfiles across machines with automatic synchronization, package installation, and symlink management.",
+  "start_url": ".",
+  "display": "browser",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": []
+}

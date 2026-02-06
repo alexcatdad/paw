@@ -25,9 +25,26 @@
     "bun-types": "^1.1.0",
     "typescript": "^5.9.2"
   },
+  "keywords": [
+    "dotfiles",
+    "cli",
+    "configuration",
+    "symlinks",
+    "homebrew",
+    "apt",
+    "macos",
+    "linux",
+    "typescript",
+    "bun",
+    "dotfiles-manager"
+  ],
+  "homepage": "https://alexcatdad.github.io/paw/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/alexcatdad/paw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alexcatdad/paw/issues"
   },
   "author": "Alex Alexandrescu",
   "license": "MIT"
