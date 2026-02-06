@@ -18,14 +18,22 @@
   <meta property="og:description" content="CLI tool for managing dotfiles across machines with automatic synchronization, package installation, and symlink management.">
   <meta property="og:site_name" content="paw">
   <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://alexcatdad.github.io/paw/og-image.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="paw — personal dotfiles manager. CLI tool for managing dotfiles across machines.">
 
   <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="paw — personal dotfiles manager">
   <meta name="twitter:description" content="CLI tool for managing dotfiles across machines with automatic synchronization, package installation, and symlink management.">
+  <meta name="twitter:image" content="https://alexcatdad.github.io/paw/og-image.svg">
+  <meta name="twitter:image:alt" content="paw — personal dotfiles manager. CLI tool for managing dotfiles across machines.">
 
   <!-- Favicon & Manifest -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
   <link rel="manifest" href="manifest.json">
 
   <!-- Structured Data -->
@@ -39,6 +47,8 @@
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux",
     "programmingLanguage": "TypeScript",
+    "image": "https://alexcatdad.github.io/paw/og-image.svg",
+    "screenshot": "https://alexcatdad.github.io/paw/og-image.svg",
     "author": {
       "@type": "Person",
       "name": "Alex Alexandrescu",
@@ -51,6 +61,20 @@
       "price": "0",
       "priceCurrency": "USD"
     }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "paw",
+        "item": "https://alexcatdad.github.io/paw/"
+      }
+    ]
   }
   </script>
 
@@ -143,6 +167,22 @@
     terminal-demo {
       display: block;
     }
+
+    /* Keyboard focus indicators (WCAG 2.4.7) */
+    :focus-visible {
+      outline: 2px solid #4ade80;
+      outline-offset: 2px;
+    }
+
+    a:focus-visible {
+      outline: 2px solid #4ade80;
+      outline-offset: 2px;
+    }
+
+    button:focus-visible {
+      outline: 2px solid #4ade80;
+      outline-offset: 2px;
+    }
   </style>
 </head>
 <body class="font-mono">
@@ -168,21 +208,25 @@
         <code-block copyable="true">curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paw/main/install.sh | bash</code-block>
       </div>
 
-      <div class="flex gap-4 flex-wrap">
-        <a href="https://github.com/alexcatdad/paw" class="border-brutal px-6 py-3 text-sm text-term-fg hover:bg-term-fg hover:text-term-bg transition-colors duration-100 inline-block no-underline">
-          GitHub &rarr;
-        </a>
-        <a href="#demo" class="border-brutal-thin px-6 py-3 text-sm text-term-gray hover:text-term-fg hover:border-term-fg transition-colors duration-100 inline-block no-underline">
-          See it in action &darr;
-        </a>
-      </div>
+      <nav aria-label="Primary">
+        <div class="flex gap-4 flex-wrap">
+          <a href="https://github.com/alexcatdad/paw" class="border-brutal px-6 py-3 text-sm text-term-fg hover:bg-term-fg hover:text-term-bg transition-colors duration-100 inline-block no-underline">
+            GitHub &rarr;
+          </a>
+          <a href="#demo" class="border-brutal-thin px-6 py-3 text-sm text-term-gray hover:text-term-fg hover:border-term-fg transition-colors duration-100 inline-block no-underline">
+            See it in action &darr;
+          </a>
+        </div>
+      </nav>
     </div>
   </header>
 
   <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
 
+  <main id="main">
+
   <!-- WARNING -->
-  <section id="main" class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="warning-heading">
+  <section class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="warning-heading">
     <div class="max-w-4xl border-brutal p-8 md:p-12 bg-term-bg" role="alert">
       <h2 id="warning-heading" class="text-2xl md:text-3xl font-bold text-term-yellow mb-4">A BIG ASS WARNING</h2>
       <p class="text-term-fg mb-4 leading-relaxed">
@@ -328,18 +372,22 @@ export default {
     </dl>
   </section>
 
+  </main>
+
   <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
 
   <!-- FOOTER -->
-  <footer class="px-6 md:px-16 lg:px-24 py-16">
+  <footer class="px-6 md:px-16 lg:px-24 py-16" role="contentinfo">
     <div class="max-w-4xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
-        <p class="text-term-dim text-sm">MIT License</p>
+        <p class="text-term-dim text-sm"><a href="https://github.com/alexcatdad/paw/blob/main/LICENSE" class="text-term-dim hover:text-term-fg transition-colors no-underline">MIT License</a></p>
         <p class="text-term-gray text-xs mt-1">Fork it. Own it. Break it. Fix it.</p>
       </div>
-      <a href="https://github.com/alexcatdad/paw" class="text-term-accent text-sm hover:text-term-fg transition-colors no-underline">
-        github.com/alexcatdad/paw
-      </a>
+      <nav aria-label="Footer">
+        <a href="https://github.com/alexcatdad/paw" class="text-term-accent text-sm hover:text-term-fg transition-colors no-underline">
+          github.com/alexcatdad/paw
+        </a>
+      </nav>
     </div>
   </footer>
 
@@ -407,7 +455,7 @@ export default {
         const card = document.createElement('div');
         card.style.cssText = 'padding:24px 28px; border-bottom:1px solid #e0e0e0; border-right:1px solid #e0e0e0;';
 
-        const h = document.createElement('p');
+        const h = document.createElement('h3');
         h.textContent = title;
         h.style.cssText = 'margin:0 0 8px 0; font-size:13px; font-weight:700; color:#e0e0e0; letter-spacing:0.08em;';
 
