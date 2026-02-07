@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="#e0e0e0" stroke-width="6"/>
+  <!-- Title -->
+  <text x="80" y="200" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="120" font-weight="bold" fill="#e0e0e0" letter-spacing="-0.05em">paw</text>
+  <!-- Subtitle -->
+  <text x="80" y="270" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="32" fill="#9ca3af">personal dotfiles manager</text>
+  <!-- Description -->
+  <text x="80" y="340" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="20" fill="#8b8fa3">CLI tool for managing dotfiles across machines.</text>
+  <text x="80" y="370" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="20" fill="#8b8fa3">Symlinks, packages, sync, audit, scaffold.</text>
+  <!-- Terminal prompt -->
+  <text x="80" y="460" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="24" fill="#4ade80" font-weight="bold">$</text>
+  <text x="110" y="460" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="24" fill="#e0e0e0">paw install</text>
+  <!-- Cursor -->
+  <rect x="330" y="440" width="14" height="26" fill="#4ade80"/>
+  <!-- Bottom bar -->
+  <line x1="80" y1="530" x2="1120" y2="530" stroke="#e0e0e0" stroke-width="3"/>
+  <text x="80" y="570" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="16" fill="#8b8fa3">TypeScript + Bun</text>
+  <text x="1120" y="570" font-family="ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace" font-size="16" fill="#8b8fa3" text-anchor="end">MIT License</text>
+</svg>
