@@ -1,34 +1,130 @@
+# .github/workflows/release.yml
+#
+# Automatic release on merge to main.
+# Parses conventional commits since the last tag to determine semver bump:
+#   - "feat:" -> minor
+#   - "fix:", "perf:", "refactor:" -> patch
+#   - "!:" or "BREAKING CHANGE" -> major
+#   - "docs:", "ci:", "chore:", "test:", "style:" -> skip (no release)
+#
+# Tags the commit, builds platform binaries, and publishes a GitHub release.
+
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
 
 jobs:
-  upload-binaries:
-    name: Upload Release Binaries
+  release:
+    name: Build & Release
     runs-on: ubuntu-latest
-    # Only run for version tags, not the 'latest' pre-release
-    if: startsWith(github.event.release.tag_name, 'v') && github.event.release.tag_name != 'latest'
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
+    # Skip if this push was the bot creating a tag (avoid double-run)
+    if: github.actor != 'github-actions[bot]' || !startsWith(github.ref, 'refs/tags/')
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      released: ${{ steps.version.outputs.skip != 'true' }}
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        env:
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          # If triggered by a tag push, use the tag directly
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Skip non-release commits
+          if echo "$HEAD_MESSAGE" | head -1 | grep -qE '^(docs|ci|chore|test|style)(\(.+\))?:'; then
+            echo "Non-release commit type. Skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Get the latest tag
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v0.0.0"
+          fi
+
+          # Parse current version
+          VERSION="${LATEST_TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # Get commits since last tag
+          COMMITS=$(git log "$LATEST_TAG"..HEAD --pretty=format:"%s" 2>/dev/null || git log --pretty=format:"%s")
+          echo "Commits since $LATEST_TAG:"
+          echo "$COMMITS"
+
+          # Determine bump type
+          BUMP="none"
+          while IFS= read -r msg; do
+            if echo "$msg" | grep -qE '^[a-z]+(\(.+\))?!:' || echo "$msg" | grep -qi 'BREAKING CHANGE'; then
+              BUMP="major"
+              break
+            fi
+            if echo "$msg" | grep -qE '^feat(\(.+\))?:'; then
+              [ "$BUMP" != "major" ] && BUMP="minor"
+            fi
+            if echo "$msg" | grep -qE '^(fix|perf|refactor)(\(.+\))?:'; then
+              [ "$BUMP" = "none" ] && BUMP="patch"
+            fi
+          done <<< "$COMMITS"
+
+          if [ "$BUMP" = "none" ]; then
+            echo "No version-bumping commits found. Skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "Bumping $BUMP: $LATEST_TAG -> $NEW_TAG"
+
+      - name: Create tag
+        if: steps.version.outputs.skip != 'true' && !startsWith(github.ref, 'refs/tags/')
+        env:
+          NEW_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+          git push origin "$NEW_TAG"
 
       - name: Setup Bun
+        if: steps.version.outputs.skip != 'true'
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
+        if: steps.version.outputs.skip != 'true'
         run: bun install
 
       - name: Type check
+        if: steps.version.outputs.skip != 'true'
         run: bun run typecheck
 
       - name: Build all targets
+        if: steps.version.outputs.skip != 'true'
         run: |
           mkdir -p dist
           bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/paw-darwin-arm64
@@ -37,26 +133,30 @@ jobs:
           bun build src/index.ts --compile --target=bun-linux-arm64 --outfile=dist/paw-linux-arm64
 
       - name: Attest build provenance
+        if: steps.version.outputs.skip != 'true'
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: 'dist/paw-*'
 
-      - name: Upload binaries to release
+      - name: Create release
+        if: steps.version.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ steps.version.outputs.tag }}
           files: |
             dist/paw-darwin-arm64
             dist/paw-darwin-x64
             dist/paw-linux-x64
             dist/paw-linux-arm64
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-homebrew:
     name: Update Homebrew Tap
     runs-on: ubuntu-latest
-    needs: upload-binaries
+    needs: release
+    if: needs.release.outputs.released == 'true'
     environment: action-runners
     steps:
       - name: Generate GitHub App token
@@ -78,7 +178,7 @@ jobs:
         run: gh release download "$TAG" --repo "$REPO" --pattern 'paw-*' --dir assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ needs.release.outputs.tag }}
           REPO: ${{ github.repository }}
 
       - name: Compute SHA256 checksums
@@ -93,7 +193,7 @@ jobs:
         id: version
         run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ needs.release.outputs.tag }}
 
       - name: Checkout homebrew-tap
         uses: actions/checkout@v6
@@ -154,9 +254,11 @@ jobs:
       - name: Commit and push
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          USER_ID: ${{ steps.get-user-id.outputs.user-id }}
         run: |
-          git config user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
-          git config user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
           git add Formula/paw.rb
           git diff --staged --quiet || {
             git commit -m "chore: update paw to ${VERSION}"
