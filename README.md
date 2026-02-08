@@ -24,16 +24,13 @@ Personal dotfiles manager CLI built with TypeScript and Bun.
 
 ## Installation
 
-**Step 1: Fork this repo** (seriously, do it)
-
-**Step 2: Update the install script URL to point to YOUR fork:**
-
 ```bash
-# Replace YOUR_USERNAME with your GitHub username
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paw/main/install.sh | bash
+brew install alexcatdad/tap/paw
 ```
 
-You'll also need to update the `REPO` constant in `src/core/update.ts` to point to your fork for self-updates to work.
+### Forking
+
+> **Fork this repo and make it your own.** Update the homebrew formula URL to point to your fork's releases, and update the `REPO` constant in `src/core/update.ts` for self-updates.
 
 ## Quick Start
 
