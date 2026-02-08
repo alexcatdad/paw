@@ -1,0 +1,8 @@
+{
+  "$schema": "https://alexcatdad.github.io/schemas/project-meta.schema.json",
+  "what": "Personal dotfiles manager CLI with symlink management and cross-machine sync.",
+  "why": "Manages dotfiles across machines with backup, rollback, and dry-run support.",
+  "tags": ["typescript", "bun", "dotfiles", "cli"],
+  "featured": false,
+  "order": 50
+}
