@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"os"
 	"testing"
 )
 
@@ -45,5 +46,15 @@ func TestMainHandlesError(t *testing.T) {
 	}
 	if buf.Len() == 0 {
 		t.Fatal("expected error output")
+	}
+}
+
+func TestExecuteRootDefaultImplementation(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"paw", "--help"}
+	if err := executeRoot(); err != nil {
+		t.Fatal(err)
 	}
 }

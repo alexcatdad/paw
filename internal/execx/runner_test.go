@@ -7,9 +7,13 @@ import (
 )
 
 func TestOSRunnerBasics(t *testing.T) {
-	r := OSRunner{}
+	r := NewOSRunner()
 	if _, err := r.LookPath("sh"); err != nil {
 		t.Fatalf("expected sh in path: %v", err)
+	}
+
+	if err := r.Run("sh", "-c", "true"); err != nil {
+		t.Fatal(err)
 	}
 
 	out, err := r.Output("sh", "-c", "printf paw")

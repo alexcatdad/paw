@@ -12,6 +12,24 @@ func TestWithCodeAndExitCode(t *testing.T) {
 	}
 }
 
+func TestCodedErrorMethods(t *testing.T) {
+	root := errors.New("root")
+	err := WithCode(ExitSystem, root)
+	if err.Error() != "root" {
+		t.Fatalf("unexpected error text: %s", err.Error())
+	}
+	var ce codedError
+	if !errors.As(err, &ce) {
+		t.Fatal("expected codedError type")
+	}
+	if !errors.Is(err, root) {
+		t.Fatal("expected unwrapped root error")
+	}
+	if WithCode(ExitSystem, nil) != nil {
+		t.Fatal("expected nil when wrapping nil error")
+	}
+}
+
 func TestExitCodeHeuristics(t *testing.T) {
 	cases := map[string]int{
 		"unknown command":  ExitUsage,

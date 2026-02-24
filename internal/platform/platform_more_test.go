@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -52,5 +53,32 @@ func TestIsWSLAndHostnameAndCommandExists(t *testing.T) {
 	}
 	if CommandExists("definitely-missing-command-xyz") {
 		t.Fatal("expected missing command")
+	}
+}
+
+func TestIsWSLProcFallbackAndMatcherEdges(t *testing.T) {
+	t.Setenv("WSL_DISTRO_NAME", "")
+	t.Setenv("WSL_INTEROP", "")
+	got := IsWSL()
+	data, err := os.ReadFile("/proc/version")
+	if err != nil {
+		if got {
+			t.Fatal("expected false when /proc/version is unavailable")
+		}
+	} else {
+		want := strings.Contains(strings.ToLower(string(data)), "microsoft")
+		if got != want {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
+	}
+
+	if !MatchPlatform(nil, "linux") {
+		t.Fatal("expected empty platform list to match")
+	}
+	if !MatchHostname("*", "anything") {
+		t.Fatal("expected wildcard hostname match")
+	}
+	if !MatchHostname("MY-HOST", "my-host") {
+		t.Fatal("expected case-insensitive hostname match")
 	}
 }
