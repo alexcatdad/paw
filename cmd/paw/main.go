@@ -2,16 +2,28 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/alexcatdad/paw/internal/app"
 	"github.com/alexcatdad/paw/internal/cli"
 )
 
-func main() {
+var executeRoot = func() error {
 	root := cli.NewRootCommand()
-	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(app.ExitCode(err))
+	return root.Execute()
+}
+
+var exitFn = os.Exit
+var errOut io.Writer = os.Stderr
+
+func run() error {
+	return executeRoot()
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(errOut, err)
+		exitFn(app.ExitCode(err))
 	}
 }

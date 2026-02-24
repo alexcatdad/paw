@@ -21,6 +21,9 @@ func TestPaths(t *testing.T) {
 	if _, err := UpdateStatePath(); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := TransactionPath(); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := LockPath(); err != nil {
 		t.Fatal(err)
 	}

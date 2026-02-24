@@ -11,7 +11,7 @@ jobs:
     name: Test (Linux Docker + Coverage)
     runs-on: ubuntu-latest
     env:
-      COVERAGE_STAGE: ${{ vars.PAW_COVERAGE_STAGE || '65' }}
+      COVERAGE_STAGE: ${{ vars.PAW_COVERAGE_STAGE || '80' }}
     steps:
       - uses: actions/checkout@v6
       - name: Dockerized test + coverage

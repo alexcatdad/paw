@@ -53,3 +53,11 @@ func TestRootLinkDryRun(t *testing.T) {
 	writeTestRepo(t, repoDir)
 	executeCommand(t, repoDir, home, "--dry-run", "link")
 }
+
+func TestNewRootCommandWrapper(t *testing.T) {
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--version"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+}
