@@ -54,7 +54,7 @@ else
   echo -e "${RED}✗${NC} Failed to download paw binary for ${OS}-${ARCH}"
   echo -e "${YELLOW}→${NC} You may need to build from source:"
   echo -e "   git clone https://github.com/${REPO}.git"
-  echo -e "   cd paw && bun install && bun run build"
+  echo -e "   cd paw && go build -o paw ./cmd/paw && mv paw ~/.local/bin/paw"
   exit 1
 fi
 

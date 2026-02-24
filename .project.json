@@ -2,8 +2,8 @@
   "what": "Personal dotfiles manager CLI with symlink management and cross-machine sync.",
   "why": "Manages dotfiles across machines with backup, rollback, and dry-run support.",
   "tags": [
-    "typescript",
-    "bun",
+    "go",
+    "toml",
     "dotfiles",
     "cli"
   ],

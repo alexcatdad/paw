@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+
+args="$*"
+
+if [[ "${args}" == *"release view latest"* ]]; then
+  printf '{"tagName":"%s"}\n' "${FAKE_GH_TAG:-v9.9.9}"
+  exit 0
+fi
+
+if [[ "${args}" == *"release download --help"* ]]; then
+  printf "verify-attestation"
+  exit 0
+fi
+
+if [[ "${args}" == *"release download latest"* ]]; then
+  dir="."
+  pattern="paw-linux-x64"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dir)
+        dir="$2"
+        shift 2
+        ;;
+      --pattern)
+        pattern="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  mkdir -p "${dir}"
+  printf "fake-binary" > "${dir}/${pattern}"
+  chmod +x "${dir}/${pattern}"
+  exit 0
+fi
+
+if [[ -n "${FAKE_GH_FAIL:-}" ]]; then
+  echo "${FAKE_GH_FAIL}" >&2
+  exit 1
+fi
+
+exit 0

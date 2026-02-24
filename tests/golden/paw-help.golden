@@ -1,0 +1,43 @@
+paw is a dotfiles manager for Linux, macOS, and WSL.
+
+Usage:
+  paw [flags]
+  paw [command]
+
+Available Commands:
+  audit             Audit repository structure and completeness
+  backup            Backup management
+  completion        Generate shell completions
+  doctor            Health check and diagnostics
+  help              Help about any command
+  init              Clone dotfiles repo and configure paw
+  install           Install packages and create symlinks
+  link              Create symlinks only
+  man               Generate man pages
+  migrate-ts-config Migrate dotfiles.config.ts to paw.toml
+  push              Commit and push dotfiles changes
+  rollback          Restore backups and remove links from last run
+  scaffold          Generate missing config templates
+  status            Show current symlink and package state
+  sync              Pull repo and refresh links
+  unlink            Remove managed symlinks
+  update            Self-update paw binary
+
+Flags:
+      --auto-update         Auto update during sync
+  -n, --dry-run             Show what would be done
+  -f, --force               Overwrite existing files
+  -h, --help                help for paw
+      --json                JSON output mode
+      --log-format string   Log format: text|json (default "text")
+      --no-interactive      Disable interactive prompts
+  -p, --path string         Path used by init command
+  -q, --quiet               Quiet output
+      --skip-hooks          Skip lifecycle hooks
+      --skip-packages       Skip package installation
+      --skip-update         Skip update check
+      --skip-verify         Skip attestation verification in update
+  -v, --verbose             Verbose output
+      --version             version for paw
+
+Use "paw [command] --help" for more information about a command.
