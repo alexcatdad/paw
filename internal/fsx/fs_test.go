@@ -8,7 +8,7 @@ import (
 
 func TestOSFSOperations(t *testing.T) {
 	base := t.TempDir()
-	fs := OSFS{}
+	fs := NewOSFS()
 	dir := filepath.Join(base, "a", "b")
 	if err := fs.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -51,6 +51,11 @@ func TestOSFSOperations(t *testing.T) {
 	if err := fs.Rename(file, renamed); err != nil {
 		t.Fatal(err)
 	}
+	f, err := fs.OpenFile(renamed, os.O_RDONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
 	if err := fs.Remove(link); err != nil {
 		t.Fatal(err)
 	}

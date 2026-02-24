@@ -82,3 +82,38 @@ func TestValidateRequiresVersionOne(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 }
+
+func TestLoadPathValidation(t *testing.T) {
+	if _, err := Load(""); err == nil {
+		t.Fatal("expected empty path error")
+	}
+	if _, err := Load(filepath.Join(t.TempDir(), "missing.toml")); err == nil {
+		t.Fatal("expected missing file error")
+	}
+}
+
+func TestValidateRejectsBadFields(t *testing.T) {
+	cfg := Default()
+	cfg.Layout = "monolith"
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected invalid layout")
+	}
+
+	cfg = Default()
+	cfg.Overrides[""] = Override{Target: "~/.zshrc"}
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected empty override key error")
+	}
+
+	cfg = Default()
+	cfg.Overrides["foo"] = Override{}
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected missing override target error")
+	}
+
+	cfg = Default()
+	cfg.Overrides["/abs"] = Override{Target: "~/.zshrc"}
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected absolute override source rejection")
+	}
+}
