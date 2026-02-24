@@ -1,0 +1,16 @@
+FROM golang:1.26.0
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git curl unzip ca-certificates bash coreutils diffutils && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV TZ=UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    HOME=/tmp/paw-home \
+    CGO_ENABLED=1 \
+    PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+RUN mkdir -p /workspace "${HOME}"
+
+WORKDIR /workspace

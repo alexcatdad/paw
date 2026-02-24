@@ -12,6 +12,6 @@
 
 <!-- How did you verify this works? -->
 
-- [ ] `bun run typecheck` passes
-- [ ] `bun test` passes
-- [ ] Tested manually with `bun run dev <command>`
+- [ ] `go test ./...` passes
+- [ ] Coverage check passes (`go test ./... -coverprofile=coverage.out`)
+- [ ] Tested manually with `go run ./cmd/paw <command>`

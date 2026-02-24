@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+
+args="$*"
+
+if [[ "${args}" == *"status --porcelain"* ]]; then
+  printf "%s" "${FAKE_GIT_STATUS:-}"
+  exit 0
+fi
+
+if [[ "${args}" == *"remote get-url origin"* ]]; then
+  printf "%s\n" "${FAKE_GIT_REMOTE_URL:-https://github.com/example/repo.git}"
+  exit 0
+fi
+
+if [[ "${args}" == *"rev-list --left-right --count"* ]]; then
+  printf "%s\n" "${FAKE_GIT_REV_LIST:-0 0}"
+  exit 0
+fi
+
+if [[ "${args}" == *"rev-parse HEAD"* ]]; then
+  state_file="${FAKE_GIT_HEAD_STATE:-/tmp/paw-fake-git-head-state}"
+  count=0
+  if [[ -f "${state_file}" ]]; then
+    count="$(cat "${state_file}")"
+  fi
+  count="$((count + 1))"
+  printf "%s" "${count}" > "${state_file}"
+  if [[ "${count}" -eq 1 ]]; then
+    printf "%s\n" "${FAKE_GIT_HEAD_1:-abc123}"
+  else
+    printf "%s\n" "${FAKE_GIT_HEAD_2:-def456}"
+  fi
+  exit 0
+fi
+
+if [[ "${args}" == *"diff --name-only"* ]]; then
+  printf "%s\n" "${FAKE_GIT_DIFF:-home/.zshrc}"
+  exit 0
+fi
+
+if [[ -n "${FAKE_GIT_FAIL:-}" ]]; then
+  echo "${FAKE_GIT_FAIL}" >&2
+  exit 1
+fi
+
+exit 0

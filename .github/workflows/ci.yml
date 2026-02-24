@@ -7,184 +7,74 @@ on:
     branches: [main]
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Lint & Type Check
-  # ─────────────────────────────────────────────────────────────────────────────
-  lint:
-    name: Lint & Type Check
+  test-linux:
+    name: Test (Linux Docker + Coverage)
     runs-on: ubuntu-latest
+    env:
+      COVERAGE_STAGE: ${{ vars.PAW_COVERAGE_STAGE || '80' }}
     steps:
       - uses: actions/checkout@v6
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Type check
-        run: bun run typecheck
-
-      - name: Check shell scripts
-        run: |
-          sudo apt-get update && sudo apt-get install -y shellcheck
-          shellcheck install.sh
-
-      - name: Validate YAML
-        run: |
-          for f in .github/workflows/*.yml; do
-            echo "Checking $f"
-            python3 -c "import yaml; yaml.safe_load(open('$f'))"
-          done
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Security Scan
-  # ─────────────────────────────────────────────────────────────────────────────
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
+      - name: Dockerized test + coverage
+        run: ./scripts/test/docker-ci.sh
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
+          name: coverage-linux
+          path: |
+            coverage.out
+            coverage-packages.txt
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+      - name: Build Linux binary
+        run: go build -o dist/paw-linux-x64 ./cmd/paw
+      - name: Smoke
+        run: |
+          ./dist/paw-linux-x64 --version 2>version.err
+          ./dist/paw-linux-x64 --help >/tmp/paw-help.txt 2>help.err
+          test ! -s version.err
+          test ! -s help.err
 
-      - name: Check for secrets (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check for personal info leaks
-        run: ./scripts/security-check.sh
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Test on macOS
-  # ─────────────────────────────────────────────────────────────────────────────
   test-macos:
-    name: Test (macOS)
+    name: Smoke (macOS)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build binary
-        run: bun build src/index.ts --compile --outfile=dist/paw
-
-      - name: Test CLI commands
-        run: |
-          ./dist/paw --version
-          ./dist/paw --help
-
-      - name: Upload macOS binary
-        uses: actions/upload-artifact@v6
+      - uses: actions/setup-go@v6
         with:
-          name: paw-darwin-arm64
-          path: dist/paw
+          go-version: '1.26'
+      - name: Build and smoke
+        run: |
+          go build -o dist/paw-darwin-arm64 ./cmd/paw
+          ./dist/paw-darwin-arm64 --version 2>version.err
+          ./dist/paw-darwin-arm64 --help >/tmp/paw-help.txt 2>help.err
+          test ! -s version.err
+          test ! -s help.err
+          ./dist/paw-darwin-arm64 man --dir ./dist/man
+          ./dist/paw-darwin-arm64 completion zsh >/tmp/paw-zsh-completion
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Test on Linux
-  # ─────────────────────────────────────────────────────────────────────────────
-  test-linux:
-    name: Test (Linux)
-    runs-on: ubuntu-latest
+  test-wsl:
+    name: Smoke (WSL Runtime)
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build binary
-        run: bun build src/index.ts --compile --outfile=dist/paw
-
-      - name: Test CLI commands
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+      - name: Build Linux binary for WSL
+        shell: pwsh
         run: |
-          ./dist/paw --version
-          ./dist/paw --help
-
-      - name: Upload Linux binary
-        uses: actions/upload-artifact@v6
-        with:
-          name: paw-linux-x64
-          path: dist/paw
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Build all platforms (only on main branch)
-  # ─────────────────────────────────────────────────────────────────────────────
-  build-all:
-    name: Build All Platforms
-    runs-on: ubuntu-latest
-    needs: [lint, security, test-macos, test-linux]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build all targets
+          $env:GOOS='linux'
+          $env:GOARCH='amd64'
+          go build -o dist/paw-linux-x64 ./cmd/paw
+      - name: Run in WSL
+        shell: pwsh
         run: |
-          mkdir -p dist
-          bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/paw-darwin-arm64
-          bun build src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/paw-darwin-x64
-          bun build src/index.ts --compile --target=bun-linux-x64 --outfile=dist/paw-linux-x64
-          bun build src/index.ts --compile --target=bun-linux-arm64 --outfile=dist/paw-linux-arm64
-
-      - name: Upload all binaries
-        uses: actions/upload-artifact@v6
-        with:
-          name: paw-binaries
-          path: dist/paw-*
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Update latest release (only on main branch)
-  # ─────────────────────────────────────────────────────────────────────────────
-  update-latest:
-    name: Update Latest Release
-    runs-on: ubuntu-latest
-    needs: [build-all]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Download binaries
-        uses: actions/download-artifact@v7
-        with:
-          name: paw-binaries
-          path: dist
-
-      - name: Update latest release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Latest Build
-          prerelease: true
-          files: |
-            dist/paw-darwin-arm64
-            dist/paw-darwin-x64
-            dist/paw-linux-x64
-            dist/paw-linux-arm64
-          body: |
-            ## Latest Build
-
-            This is an automatically updated pre-release with the latest changes from `main`.
-
-            **Install:**
-            ```bash
-            curl -fsSL https://raw.githubusercontent.com/alexcatdad/paw/main/install.sh | bash
-            ```
-
-            **Changes:** See [commit history](https://github.com/alexcatdad/paw/commits/main)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          $distroList = (wsl -l -q 2>$null)
+          if ([string]::IsNullOrWhiteSpace($distroList)) {
+            Write-Host "No WSL distro available on runner; skipping WSL smoke step."
+            exit 0
+          }
+          $workspace = "${{ github.workspace }}"
+          $wslWorkspace = (wsl wslpath -a "$workspace").Trim()
+          wsl bash -lc "cd \"$wslWorkspace/dist\" && chmod +x paw-linux-x64 && export WSL_DISTRO_NAME=Ubuntu && ./paw-linux-x64 --version && ./paw-linux-x64 --help && ./paw-linux-x64 status --help >/dev/null"

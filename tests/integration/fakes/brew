@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+
+if [[ "$*" == *"list --formula"* || "$*" == *"list --cask"* ]]; then
+  if [[ -n "${FAKE_BREW_ALREADY_INSTALLED:-}" ]]; then
+    exit 0
+  fi
+  exit 1
+fi
+
+if [[ -n "${FAKE_BREW_FAIL:-}" ]]; then
+  echo "${FAKE_BREW_FAIL}" >&2
+  exit 1
+fi
+
+exit 0

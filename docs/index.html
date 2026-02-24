@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>paw — personal dotfiles manager</title>
-  <meta name="description" content="CLI tool for managing dotfiles across machines with automatic synchronization, package installation, and symlink management. Built with TypeScript and Bun.">
-  <meta name="keywords" content="dotfiles, cli, configuration, symlinks, homebrew, apt, macos, linux, typescript, bun, dotfiles-manager">
+  <meta name="description" content="CLI tool for managing dotfiles across machines with automatic synchronization, package installation, and symlink management. Built with Go and native TOML config.">
+  <meta name="keywords" content="dotfiles, cli, configuration, symlinks, homebrew, apt, macos, linux, go, toml, dotfiles-manager">
   <meta name="author" content="Alex Alexandrescu">
   <meta name="theme-color" content="#0a0a0a">
   <meta name="color-scheme" content="dark">
@@ -43,7 +43,7 @@
     "url": "https://alexcatdad.github.io/paw/",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "macOS, Linux",
-    "programmingLanguage": "TypeScript",
+    "programmingLanguage": "Go",
     "image": "https://alexcatdad.github.io/paw/og-image.png",
     "author": {
       "@type": "Person",
@@ -171,7 +171,7 @@
       </p>
       <p class="text-base text-term-gray mb-12 max-w-xl leading-relaxed">
         CLI tool for managing dotfiles across machines with automatic synchronization,
-        package installation, and symlink management. Built with TypeScript and Bun.
+        package installation, and symlink management. Built with Go and native TOML config.
       </p>
 
       <div class="mb-8">
@@ -262,7 +262,7 @@
   <!-- CONFIG EXAMPLE -->
   <section class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="config-heading">
     <h2 id="config-heading" class="text-xs text-term-gray uppercase tracking-widest mb-3">Configuration</h2>
-    <p class="text-term-dim text-sm mb-6">dotfiles.config.ts in your repo</p>
+    <p class="text-term-dim text-sm mb-6">paw.toml in your repo</p>
     <div class="max-w-4xl">
       <code-block>import type { DotfilesConfig } from "paw";
 

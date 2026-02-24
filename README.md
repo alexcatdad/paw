@@ -1,190 +1,102 @@
 # paw 🐱
 
-Personal dotfiles manager CLI built with TypeScript and Bun.
+`paw` is a Go-based dotfiles manager for Linux, macOS, and WSL.
 
-> [!WARNING]
-> ## A BIG ASS WARNING
->
-> **FORK THIS REPO. DON'T USE MINE.**
->
-> This is my personal tool. You should **fork it** and make it your own. I may push breaking changes, remove features, or abandon it entirely. If you rely on my repo directly, that's on you.
->
-> **USE AT YOUR OWN RISK.**
->
-> This tool makes potentially **destructive changes** to your home directory:
->
-> - **Creates symlinks** that overwrite existing files (backs up originals, but still)
-> - **Executes arbitrary code** from your `dotfiles.config.ts` (hooks run with your full permissions)
-> - **Installs packages** via Homebrew/apt (runs `brew install`, `sudo apt install`)
-> - **Self-updates** by downloading binaries from GitHub
->
-> This is an open source tool with **no warranty**. Review the code, understand what it does, and use it at your own risk. If you're not comfortable with a tool modifying `~/.zshrc`, `~/.gitconfig`, etc., this isn't for you.
->
-> **You have been warned.**
-
-## Installation
+## Install
 
 ```bash
-brew install alexcatdad/tap/paw
+curl -fsSL https://raw.githubusercontent.com/alexcatdad/paw/main/install.sh | bash
 ```
-
-### Forking
-
-> **Fork this repo and make it your own.** Update the homebrew formula URL to point to your fork's releases, and update the `REPO` constant in `src/core/update.ts` for self-updates.
 
 ## Quick Start
 
 ```bash
-# Initialize with your dotfiles repo
 paw init https://github.com/yourusername/dotfiles
-
-# Or if you already have dotfiles cloned
 paw install
-
-# Preview changes without doing anything
-paw install --dry-run
+paw status
 ```
 
-## Commands
+## Core Commands
 
-| Command | Description |
-|---------|-------------|
-| `paw init <repo>` | Clone dotfiles repo and run initial setup |
-| `paw install` | Full setup: install packages and create symlinks |
-| `paw link` | Create symlinks only (skip packages) |
-| `paw unlink` | Remove all managed symlinks |
-| `paw sync` | Pull dotfiles repo and refresh links |
-| `paw push [msg]` | Commit and push dotfiles changes |
-| `paw status` | Show current symlink and package state |
-| `paw audit` | Analyze repo structure and completeness |
-| `paw scaffold` | List or generate missing config templates |
-| `paw doctor` | Health check and diagnostics |
-| `paw update` | Update paw binary (self-update) |
-| `paw rollback` | Restore backups from last run |
-| `paw backup list` | List backup files |
-| `paw backup restore` | Restore a specific backup |
-| `paw backup clean` | Remove old backups |
+- `paw init <repo>`
+- `paw install`
+- `paw link`
+- `paw unlink`
+- `paw status`
+- `paw sync`
+- `paw push [message]`
+- `paw update`
+- `paw rollback`
+- `paw backup list|restore|clean`
+- `paw audit`
+- `paw scaffold`
+- `paw doctor`
+- `paw migrate-ts-config`
+- `paw completion [bash|zsh|fish]`
+- `paw man`
 
-## Options
+## Config (`paw.toml`)
 
-| Flag | Description |
-|------|-------------|
-| `-n, --dry-run` | Preview changes without making them |
-| `-f, --force` | Overwrite existing files (creates backups) |
-| `-v, --verbose` | Show detailed output |
-| `-q, --quiet` | Suppress output (for sync in shell startup) |
-| `--json` | Output as JSON (audit command) |
-| `--skip-packages` | Skip package installation |
-| `--skip-hooks` | Skip pre/post hooks |
+`paw` is native-only TOML. No runtime TS/JS execution.
 
-## Configuration
+```toml
+version = 1
+layout = "hybrid"
 
-Paw looks for `dotfiles.config.ts` in your dotfiles repo:
+[packages]
+common = ["ripgrep", "fzf"]
+darwin = ["ghostty"]
+linux_apt = ["git", "curl"]
+linux_brew = []
+wsl_apt = ["git", "curl"]
+wsl_brew = []
 
-```typescript
-import type { DotfilesConfig } from "paw";
+[ignore]
+paths = [".zshrc.local", ".gitconfig.local"]
 
-export default {
-  symlinks: {
-    "shell/zshrc": ".zshrc",
-    "git/gitconfig": ".gitconfig",
-    "starship/starship.toml": ".config/starship.toml",
-  },
-  packages: {
-    common: ["starship", "eza", "fzf", "zoxide", "ripgrep"],
-    darwin: ["coreutils"],
-    linux: {
-      apt: ["build-essential"],
-      brew: ["gcc"],
-    },
-  },
-  templates: {
-    "templates/gitconfig.local": ".gitconfig.local",
-  },
-  ignore: [],
-  backup: {
-    enabled: true,
-    maxAge: 30,
-    maxCount: 5,
-  },
-  hooks: {
-    preInstall: async (ctx) => {
-      // Runs before installation
-    },
-    postInstall: async (ctx) => {
-      // Runs after installation
-    },
-  },
-} satisfies DotfilesConfig;
+[backup]
+enabled = true
+max_age = 30
+max_count = 5
+
+[hooks]
+post_install = "echo installed"
+
+[overrides]
+"extras/ssh-config" = { target = ".ssh/config", platform = ["darwin", "linux", "wsl"] }
 ```
 
-## Auditing Your Dotfiles
+## Hybrid Layout
 
-Check what's missing from your setup:
+Store managed files under `home/` and paw links them into `$HOME`:
+
+```text
+home/.zshrc                   -> ~/.zshrc
+home/.config/git/config       -> ~/.config/git/config
+home/.config/starship.toml    -> ~/.config/starship.toml
+```
+
+Use `[overrides]` for exceptions and conditional links.
+
+## Security Notes
+
+- Hooks are shell command strings and run with user permissions.
+- Paths are validated to stay inside `$HOME` (targets) and repo (sources).
+- Package names are validated before shell execution.
+
+## Testing
+
+Deterministic Linux CI/local run:
 
 ```bash
-$ paw audit
-
-═══ Dotfiles Audit ═══
-
-  Repository  ~/dotfiles
-  Score       75/100
-
-─── Missing ───
-
-⚠ Missing SSH Config: SSH configuration and keys setup
-→ Missing Tmux: Terminal multiplexer configuration
-
-─── Summary ───
-
-  Errors       0
-  Warnings     1
-  Suggestions  1
+./scripts/test/docker-ci.sh
 ```
 
-Generate missing configs:
+Coverage stage gate (`65`, `80`, `90`) and package minima:
 
 ```bash
-$ paw scaffold list              # See available templates
-$ paw scaffold "Git Config"      # Generate git config template
+COVERAGE_STAGE=65 ./scripts/test/coverage-check.sh
 ```
-
-## Cross-Machine Sync
-
-On machine A (making changes):
-```bash
-paw push "update zsh config"
-```
-
-On machine B (shell startup auto-syncs):
-```
-✓ Dotfiles synced (3 files updated)
-```
-
-Add to your `.zshrc` for automatic sync:
-```bash
-paw sync --quiet
-```
-
-## Building from Source
-
-```bash
-git clone https://github.com/alexcatdad/paw.git
-cd paw
-bun install
-bun run dev status        # Run locally
-bun run typecheck         # Type check
-bun run build:all         # Build all platform binaries
-```
-
-## Security
-
-- **Path validation**: Symlinks and scaffolded files are validated to stay within allowed directories
-- **Package name validation**: Package names are validated to prevent command injection
-- **Backup before overwrite**: Original files are backed up before being replaced
-- **Dry-run mode**: Preview all changes before applying them
-
-**However**: Your `dotfiles.config.ts` is executed as code. Only use dotfiles repos you trust.
 
 ## License
 

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/_common.sh"
+
+if [[ -n "${FAKE_DPKG_PRESENT:-}" ]]; then
+  exit 0
+fi
+exit 1

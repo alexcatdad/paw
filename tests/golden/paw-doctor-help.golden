@@ -1,0 +1,22 @@
+Health check and diagnostics
+
+Usage:
+  paw doctor [flags]
+
+Flags:
+  -h, --help   help for doctor
+
+Global Flags:
+      --auto-update         Auto update during sync
+  -n, --dry-run             Show what would be done
+  -f, --force               Overwrite existing files
+      --json                JSON output mode
+      --log-format string   Log format: text|json (default "text")
+      --no-interactive      Disable interactive prompts
+  -p, --path string         Path used by init command
+  -q, --quiet               Quiet output
+      --skip-hooks          Skip lifecycle hooks
+      --skip-packages       Skip package installation
+      --skip-update         Skip update check
+      --skip-verify         Skip attestation verification in update
+  -v, --verbose             Verbose output

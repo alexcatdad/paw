@@ -2,7 +2,7 @@
 
 ## Important Context
 
-paw is a personal dotfiles manager that executes user-provided configuration (`dotfiles.config.ts`) with full permissions. It creates symlinks, installs packages, and runs lifecycle hooks. **Only use dotfiles repos you trust.**
+paw is a personal dotfiles manager driven by `paw.toml`. It creates symlinks, installs packages, and can run lifecycle hook command strings with user permissions. **Only use dotfiles repos you trust.**
 
 ## Reporting a Vulnerability
 
@@ -25,7 +25,7 @@ Security concerns that are **in scope**:
 - Self-update mechanism vulnerabilities (binary verification, MITM)
 
 Security concerns that are **out of scope**:
-- Malicious `dotfiles.config.ts` — this file is user-controlled code and runs with full permissions by design
+- Malicious hook commands in `paw.toml` — hooks are user-controlled and run with full permissions by design
 - Anything requiring physical access to the machine
 - Social engineering
 

@@ -1,10 +1,9 @@
-# Dependencies
-node_modules/
-bun.lockb
-
 # Build output
 dist/
-*.bun-build
+/paw
+*.test
+!tests/docker/Dockerfile.test
+!cmd/paw/main.go
 
 # IDE
 .idea/
@@ -15,6 +14,9 @@ dist/
 
 # Test coverage
 coverage/
+coverage.out
+coverage*.out
+coverage-packages.txt
 
 # Environment
 .env
