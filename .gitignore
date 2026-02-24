@@ -1,7 +1,9 @@
 # Build output
 dist/
-paw
+/paw
 *.test
+!tests/docker/Dockerfile.test
+!cmd/paw/main.go
 
 # IDE
 .idea/
