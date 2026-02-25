@@ -11,6 +11,7 @@ docker build -f tests/docker/Dockerfile.test -t "${IMAGE_TAG}" .
 docker run --rm \
   -e COVERAGE_STAGE="${COVERAGE_STAGE:-65}" \
   -e COVERAGE_THRESHOLD="${COVERAGE_THRESHOLD:-}" \
+  -e PAW_DOCKER_REAL_DEPS=1 \
   -e TZ=UTC \
   -e LANG=C.UTF-8 \
   -e LC_ALL=C.UTF-8 \
