@@ -149,6 +149,11 @@
       display: block;
     }
 
+    /* Drop right border on last feature card in odd-count grid */
+    feature-card:last-child > div {
+      border-right: none;
+    }
+
     /* Keyboard focus indicators (WCAG 2.4.7) */
     :focus-visible {
       outline: 2px solid #4ade80;
@@ -196,28 +201,6 @@
 
   <main id="main">
 
-  <!-- WARNING -->
-  <section class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="warning-heading">
-    <div class="max-w-4xl border-brutal p-8 md:p-12 bg-term-bg" role="alert">
-      <h2 id="warning-heading" class="text-2xl md:text-3xl font-bold text-term-yellow mb-4">A BIG ASS WARNING</h2>
-      <p class="text-term-fg mb-4 leading-relaxed">
-        <strong>FORK THIS REPO. DON'T USE MINE.</strong>
-      </p>
-      <p class="text-term-dim leading-relaxed mb-4">
-        This is my personal tool. You should fork it and make it your own.
-        I may push breaking changes, remove features, or abandon it entirely.
-      </p>
-      <p class="text-term-dim leading-relaxed">
-        This tool makes potentially <span class="text-term-red">destructive changes</span> to your home directory:
-        creates symlinks, executes arbitrary code from your config, installs packages,
-        and self-updates by downloading binaries.
-        <span class="text-term-yellow">You have been warned.</span>
-      </p>
-    </div>
-  </section>
-
-  <div class="border-t-[3px] border-term-border mx-6 md:mx-16 lg:mx-24"></div>
-
   <!-- TERMINAL DEMO -->
   <section id="demo" class="px-6 md:px-16 lg:px-24 py-16" aria-labelledby="demo-heading">
     <h2 id="demo-heading" class="text-xs text-term-gray uppercase tracking-widest mb-6">Live Demo</h2>
@@ -254,6 +237,10 @@
         title="LIFECYCLE HOOKS"
         description="preInstall, postInstall, prePush, postPush, preUpdate, postUpdate, preRollback, postRollback. Full control."
       ></feature-card>
+      <feature-card
+        title="DRIFT DETECTION"
+        description="Inspect divergence between your live machine and the repo with paw drift status. Import changes with paw drift apply. Exits code 5 on drift for cron/CI alerting."
+      ></feature-card>
     </div>
   </section>
 
@@ -264,25 +251,28 @@
     <h2 id="config-heading" class="text-xs text-term-gray uppercase tracking-widest mb-3">Configuration</h2>
     <p class="text-term-dim text-sm mb-6">paw.toml in your repo</p>
     <div class="max-w-4xl">
-      <code-block>import type { DotfilesConfig } from "paw";
+      <code-block>version = 1
+layout = "hybrid"
 
-export default {
-  symlinks: {
-    "shell/zshrc": ".zshrc",
-    "git/gitconfig": ".gitconfig",
-    "starship/starship.toml": ".config/starship.toml",
-  },
-  packages: {
-    common: ["starship", "eza", "fzf", "zoxide", "ripgrep"],
-    darwin: ["coreutils"],
-    linux: { apt: ["build-essential"], brew: ["gcc"] },
-  },
-  hooks: {
-    postInstall: async (ctx) =&gt; {
-      console.log("dotfiles installed on", ctx.platform);
-    },
-  },
-} satisfies DotfilesConfig;</code-block>
+[packages]
+common = ["ripgrep", "fzf", "starship", "eza", "zoxide"]
+darwin = ["ghostty"]
+linux_apt = ["git", "curl"]
+linux_brew = []
+
+[ignore]
+paths = [".zshrc.local", ".gitconfig.local"]
+
+[backup]
+enabled = true
+max_age = 30
+max_count = 5
+
+[hooks]
+post_install = "echo installed"
+
+[overrides]
+"extras/ssh-config" = { target = ".ssh/config", platform = ["darwin", "linux", "wsl"] }</code-block>
     </div>
   </section>
 
@@ -319,6 +309,14 @@ export default {
       <div class="flex justify-between border-b border-term-gray/20 py-2">
         <dt class="text-term-accent">paw status</dt>
         <dd class="text-term-dim m-0">Current state</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw drift status</dt>
+        <dd class="text-term-dim m-0">Show config drift</dd>
+      </div>
+      <div class="flex justify-between border-b border-term-gray/20 py-2">
+        <dt class="text-term-accent">paw drift apply</dt>
+        <dd class="text-term-dim m-0">Import drift</dd>
       </div>
       <div class="flex justify-between border-b border-term-gray/20 py-2">
         <dt class="text-term-accent">paw audit</dt>
@@ -457,10 +455,10 @@ export default {
               { text: '', type: 'blank' },
               { text: '\u2500\u2500\u2500 Symlinks \u2500\u2500\u2500', type: 'subheader' },
               { text: '', type: 'blank' },
-              { pre: '\u2713', suf: ' shell/zshrc        \u2192 ~/.zshrc', type: 'success' },
-              { pre: '\u2713', suf: ' git/gitconfig      \u2192 ~/.gitconfig', type: 'success' },
-              { pre: '\u2713', suf: ' starship.toml      \u2192 ~/.config/starship.toml', type: 'success' },
-              { text: '\u25CB tmux.conf          \u2192 ~/.tmux.conf (skipped)', type: 'skip' },
+              { pre: '\u2713', suf: ' home/.zshrc              \u2192 ~/.zshrc', type: 'success' },
+              { pre: '\u2713', suf: ' home/.gitconfig          \u2192 ~/.gitconfig', type: 'success' },
+              { pre: '\u2713', suf: ' home/.config/starship.toml \u2192 ~/.config/starship.toml', type: 'success' },
+              { text: '\u25CB home/.tmux.conf        \u2192 ~/.tmux.conf (skipped)', type: 'skip' },
               { text: '', type: 'blank' },
               { text: '\u2500\u2500\u2500 Packages \u2500\u2500\u2500', type: 'subheader' },
               { text: '', type: 'blank' },
@@ -501,9 +499,9 @@ export default {
               { text: '', type: 'blank' },
               { text: '\u2500\u2500\u2500 Symlinks \u2500\u2500\u2500', type: 'subheader' },
               { text: '', type: 'blank' },
-              { pre: '\u25CC [dry-run]', suf: ' Would link shell/zshrc \u2192 ~/.zshrc', type: 'dryrun' },
-              { pre: '\u25CC [dry-run]', suf: ' Would link git/gitconfig \u2192 ~/.gitconfig', type: 'dryrun' },
-              { pre: '\u25CC [dry-run]', suf: ' Would link starship.toml \u2192 ~/.config/starship.toml', type: 'dryrun' },
+              { pre: '\u25CC [dry-run]', suf: ' Would link home/.zshrc \u2192 ~/.zshrc', type: 'dryrun' },
+              { pre: '\u25CC [dry-run]', suf: ' Would link home/.gitconfig \u2192 ~/.gitconfig', type: 'dryrun' },
+              { pre: '\u25CC [dry-run]', suf: ' Would link home/.config/starship.toml \u2192 ~/.config/starship.toml', type: 'dryrun' },
               { text: '', type: 'blank' },
               { text: '\u2500\u2500\u2500 Summary \u2500\u2500\u2500', type: 'subheader' },
               { text: '', type: 'blank' },
