@@ -22,5 +22,8 @@ coverage-packages.txt
 .env
 .env.local
 
+# Security scan output
+security-summary.json
+
 # Worktrees
 .worktrees/
