@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════════════════
 # PAW - Dotfiles Manager Installation Script
-# Run this to install the paw CLI:
-#   curl -fsSL https://raw.githubusercontent.com/alexcatdad/paw/main/install.sh | bash
+# Run this to install the paw CLI via Homebrew tap:
+#   ./install.sh
 # ══════════════════════════════════════════════════════════════════════════════
 
-set -e
-
-REPO="alexcatdad/paw"
-BIN_DIR="$HOME/.local/bin"
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -21,51 +18,35 @@ NC='\033[0m' # No Color
 echo -e "${CYAN}${BOLD}🐱 paw${NC} - dotfiles manager"
 echo ""
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Detect platform and architecture
-# ─────────────────────────────────────────────────────────────────────────────
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-
-# Normalize architecture names
-case "$ARCH" in
-  x86_64) ARCH="x64" ;;
-  aarch64|arm64) ARCH="arm64" ;;
-esac
-
-echo -e "${GREEN}→${NC} Detected: ${OS}-${ARCH}"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Create bin directory
-# ─────────────────────────────────────────────────────────────────────────────
-mkdir -p "$BIN_DIR"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Download pre-built binary
-# ─────────────────────────────────────────────────────────────────────────────
-BINARY="paw-${OS}-${ARCH}"
-DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY}"
-
-echo -e "${GREEN}→${NC} Downloading paw..."
-if curl -fsSL "$DOWNLOAD_URL" -o "$BIN_DIR/paw" 2>/dev/null; then
-  chmod +x "$BIN_DIR/paw"
-  echo -e "${GREEN}✓${NC} Installed paw to $BIN_DIR/paw"
-else
-  echo -e "${RED}✗${NC} Failed to download paw binary for ${OS}-${ARCH}"
-  echo -e "${YELLOW}→${NC} You may need to build from source:"
-  echo -e "   git clone https://github.com/${REPO}.git"
-  echo -e "   cd paw && go build -o paw ./cmd/paw && mv paw ~/.local/bin/paw"
+if ! command -v brew >/dev/null 2>&1; then
+  echo -e "${RED}✗${NC} Homebrew is required but not installed."
+  echo -e "${YELLOW}→${NC} Install Homebrew first: https://brew.sh"
   exit 1
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Ensure ~/.local/bin is in PATH
-# ─────────────────────────────────────────────────────────────────────────────
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-  echo ""
-  echo -e "${YELLOW}Note:${NC} $BIN_DIR is not in your PATH"
-  echo -e "Add this to your shell config:"
-  echo -e "  ${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
+echo -e "${GREEN}→${NC} Tapping alexcatdad/tap..."
+brew tap alexcatdad/tap >/dev/null
+
+echo -e "${GREEN}→${NC} Installing paw with Homebrew..."
+if brew list --formula alexcatdad/tap/paw >/dev/null 2>&1; then
+  brew upgrade alexcatdad/tap/paw || true
+else
+  brew install alexcatdad/tap/paw
+fi
+
+if ! brew list --formula alexcatdad/tap/paw >/dev/null 2>&1; then
+  echo -e "${RED}✗${NC} Homebrew formula alexcatdad/tap/paw is not installed."
+  exit 1
+fi
+
+if ! command -v paw >/dev/null 2>&1; then
+  echo -e "${RED}✗${NC} paw is not available in PATH after install."
+  exit 1
+fi
+
+if ! paw --version >/dev/null 2>&1; then
+  echo -e "${RED}✗${NC} paw installed but failed version check."
+  exit 1
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +54,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}${BOLD}✓ Installation complete!${NC}"
+echo -e "${GREEN}→${NC} Installed version: $(paw --version)"
 echo ""
 echo -e "${BOLD}Next steps:${NC}"
 echo -e "  ${CYAN}paw init <dotfiles-repo-url>${NC}  # Set up your dotfiles"

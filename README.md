@@ -5,7 +5,8 @@
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alexcatdad/paw/main/install.sh | bash
+brew tap alexcatdad/tap
+brew install alexcatdad/tap/paw
 ```
 
 ## Quick Start
