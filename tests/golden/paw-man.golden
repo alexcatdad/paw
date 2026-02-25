@@ -76,7 +76,7 @@ paw is a dotfiles manager for Linux, macOS, and WSL.
 
 .SH SEE ALSO
 .PP
-\fBpaw-audit(1)\fP, \fBpaw-backup(1)\fP, \fBpaw-completion(1)\fP, \fBpaw-doctor(1)\fP, \fBpaw-init(1)\fP, \fBpaw-install(1)\fP, \fBpaw-link(1)\fP, \fBpaw-man(1)\fP, \fBpaw-migrate-ts-config(1)\fP, \fBpaw-push(1)\fP, \fBpaw-rollback(1)\fP, \fBpaw-scaffold(1)\fP, \fBpaw-status(1)\fP, \fBpaw-sync(1)\fP, \fBpaw-unlink(1)\fP, \fBpaw-update(1)\fP
+\fBpaw-audit(1)\fP, \fBpaw-backup(1)\fP, \fBpaw-completion(1)\fP, \fBpaw-doctor(1)\fP, \fBpaw-drift(1)\fP, \fBpaw-init(1)\fP, \fBpaw-install(1)\fP, \fBpaw-link(1)\fP, \fBpaw-man(1)\fP, \fBpaw-migrate-ts-config(1)\fP, \fBpaw-push(1)\fP, \fBpaw-rollback(1)\fP, \fBpaw-scaffold(1)\fP, \fBpaw-status(1)\fP, \fBpaw-sync(1)\fP, \fBpaw-unlink(1)\fP, \fBpaw-update(1)\fP
 
 
 .SH HISTORY

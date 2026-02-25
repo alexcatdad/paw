@@ -8,6 +8,7 @@ import (
 	"github.com/alexcatdad/paw/internal/app"
 	"github.com/alexcatdad/paw/internal/backup"
 	"github.com/alexcatdad/paw/internal/clock"
+	"github.com/alexcatdad/paw/internal/drift"
 	"github.com/alexcatdad/paw/internal/execx"
 	"github.com/alexcatdad/paw/internal/fsx"
 	"github.com/alexcatdad/paw/internal/hooks"
@@ -46,6 +47,7 @@ func NewRootCommandWithDeps(deps Dependencies) *cobra.Command {
 	hooks.SetDependencies(deps.Runner)
 	symlink.SetDependencies(deps.Runner, deps.FS, deps.Clock)
 	backup.SetDependencies(deps.FS, deps.Clock)
+	drift.SetDependencies(deps.Runner, deps.FS, deps.Clock)
 
 	opts := &app.GlobalOptions{}
 
@@ -83,6 +85,7 @@ func NewRootCommandWithDeps(deps Dependencies) *cobra.Command {
 		newLinkCommand(opts),
 		newUnlinkCommand(opts),
 		newStatusCommand(opts),
+		newDriftCommand(opts),
 		newBackupCommand(opts),
 		newRollbackCommand(opts),
 		newSyncCommand(opts),

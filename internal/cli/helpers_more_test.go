@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alexcatdad/paw/internal/config"
+	"github.com/alexcatdad/paw/internal/drift"
 	"github.com/alexcatdad/paw/internal/output"
 	"github.com/alexcatdad/paw/internal/symlink"
 )
@@ -24,6 +25,23 @@ func TestSaveLastRunAndStatusPrinting(t *testing.T) {
 	}
 	printStatusStates(states, logger)
 	printSystemTable(logger, "/tmp/repo", home)
+}
+
+func TestSaveDriftLastRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	result := drift.ApplyResult{
+		Applied: []drift.Finding{
+			{
+				Scope:      drift.ScopeFiles,
+				SourcePath: "/tmp/repo/home/.zshrc",
+				TargetPath: filepath.Join(home, ".zshrc"),
+			},
+		},
+	}
+	if err := saveDriftLastRun(result); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestGenerateTemplates(t *testing.T) {
