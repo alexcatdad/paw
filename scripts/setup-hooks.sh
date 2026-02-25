@@ -21,7 +21,17 @@ cat > "$HOOK_FILE" << 'EOF'
 # Pre-commit hook: Run security checks
 #
 
-echo "Running pre-commit security checks..."
+set -euo pipefail
+
+echo "Running pre-commit checks..."
+
+# gofmt check
+unformatted=$(gofmt -s -l . | grep -E '\.go$' | grep -v '^dist/' || true)
+if [ -n "$unformatted" ]; then
+    echo "Unformatted Go files (run gofmt -s -w .):"
+    echo "$unformatted" | sed 's/^/  /'
+    exit 1
+fi
 
 # Run security check script
 if [ -f "./scripts/security-check.sh" ]; then
