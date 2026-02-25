@@ -11,15 +11,23 @@ RUN_VULNCHECK="${RUN_VULNCHECK:-1}"
 SEVERITY_THRESHOLD="${SEVERITY_THRESHOLD:-high}"
 read -r -a lint_targets <<< "${LINT_TARGET}"
 
-command -v gofmt >/dev/null 2>&1 || { echo "gofmt is required" >&2; exit 1; }
 command -v go >/dev/null 2>&1 || { echo "go is required" >&2; exit 1; }
 command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint is required" >&2; exit 1; }
 command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck is required" >&2; exit 1; }
 command -v actionlint >/dev/null 2>&1 || { echo "actionlint is required" >&2; exit 1; }
 
+gofmt_bin="$(command -v gofmt || true)"
+if [[ -z "${gofmt_bin}" ]]; then
+  gofmt_bin="$(go env GOROOT)/bin/gofmt"
+fi
+if [[ ! -x "${gofmt_bin}" ]]; then
+  echo "gofmt is required" >&2
+  exit 1
+fi
+
 echo "Running quality checks (stage=${QUALITY_STAGE})"
 
-unformatted="$(gofmt -s -l . | grep -E '\.go$' | grep -v '^dist/' || true)"
+unformatted="$("${gofmt_bin}" -s -l . | grep -E '\.go$' | grep -v '^dist/' || true)"
 if [[ -n "${unformatted}" ]]; then
   echo "Unformatted Go files found:" >&2
   echo "${unformatted}" >&2
