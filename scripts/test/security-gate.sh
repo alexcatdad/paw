@@ -29,6 +29,8 @@ resolve_bin() {
 jq_bin="$(resolve_bin jq /usr/bin/jq)"
 govulncheck_bin="$(resolve_bin govulncheck /usr/local/bin/govulncheck)"
 gosec_bin="$(resolve_bin gosec /usr/local/bin/gosec)"
+path_override="$(dirname "${govulncheck_bin}"):$(dirname "${gosec_bin}"):${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+export PATH="${path_override}"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT

@@ -32,6 +32,8 @@ go_bin="$(resolve_bin go /usr/local/go/bin/go)"
 golangci_lint_bin="$(resolve_bin golangci-lint /usr/local/bin/golangci-lint)"
 shellcheck_bin="$(resolve_bin shellcheck /usr/bin/shellcheck)"
 actionlint_bin="$(resolve_bin actionlint /usr/local/bin/actionlint)"
+path_override="$(dirname "${go_bin}"):$(dirname "${golangci_lint_bin}"):${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+export PATH="${path_override}"
 
 gofmt_bin="$(command -v gofmt || true)"
 if [[ -z "${gofmt_bin}" ]]; then
