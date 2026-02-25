@@ -28,6 +28,15 @@ resolve_bin() {
 go_bin="$(resolve_bin go /usr/local/go/bin/go)"
 goimports_bin="$(resolve_bin goimports /usr/local/bin/goimports)"
 golangci_lint_bin="$(resolve_bin golangci-lint /usr/local/bin/golangci-lint)"
+path_override="$(dirname "${go_bin}"):$(dirname "${golangci_lint_bin}"):${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+export PATH="${path_override}"
+if [[ " ${GOFLAGS:-} " != *" -buildvcs=false "* ]]; then
+  if [[ -n "${GOFLAGS:-}" ]]; then
+    export GOFLAGS="${GOFLAGS} -buildvcs=false"
+  else
+    export GOFLAGS="-buildvcs=false"
+  fi
+fi
 
 gofmt_bin="$(command -v gofmt || true)"
 if [[ -z "${gofmt_bin}" ]]; then
@@ -42,6 +51,7 @@ echo "Applying gofmt..."
 "${gofmt_bin}" -s -w .
 
 echo "Applying goimports..."
+git config --global --add safe.directory "${ROOT_DIR}" || true
 mapfile -t go_files < <(git ls-files "*.go")
 if (( ${#go_files[@]} > 0 )); then
   "${goimports_bin}" -w "${go_files[@]}"

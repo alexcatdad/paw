@@ -1,4 +1,4 @@
-name: CI
+name: integration
 
 on:
   push:
@@ -21,6 +21,7 @@ jobs:
             -e SEVERITY_THRESHOLD=high \
             -e QUALITY_STAGE=baseline \
             -e HOME=/tmp/paw-home \
+            -e PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             paw-quality-env:local \
@@ -105,3 +106,29 @@ jobs:
           $workspace = "${{ github.workspace }}"
           $wslWorkspace = (wsl wslpath -a "$workspace").Trim()
           wsl bash -lc "cd \"$wslWorkspace/dist\" && chmod +x paw-linux-x64 && export WSL_DISTRO_NAME=Ubuntu && ./paw-linux-x64 --version && ./paw-linux-x64 --help && ./paw-linux-x64 status --help >/dev/null"
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - quality-linux
+      - test-linux
+      - test-macos
+      - test-wsl
+    steps:
+      - name: Verify all integration jobs passed
+        run: |
+          results=(
+            "${{ needs.quality-linux.result }}"
+            "${{ needs.test-linux.result }}"
+            "${{ needs.test-macos.result }}"
+            "${{ needs.test-wsl.result }}"
+          )
+          for result in "${results[@]}"; do
+            if [[ "${result}" != "success" ]]; then
+              echo "Required job did not succeed: ${result}"
+              exit 1
+            fi
+          done
+          echo "All integration prerequisites passed."
