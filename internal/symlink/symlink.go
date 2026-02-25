@@ -96,7 +96,7 @@ func BuildEntries(repoDir string, homeDir string, cfg config.Config) ([]Entry, e
 		}
 		return nil
 	}); err != nil {
-		// homeRoot may not exist yet (empty or newly-initialised repo).
+		// homeRoot may not exist yet (empty or newly-initialized repo).
 		// Treat ErrNotExist as non-fatal; propagate all other errors.
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("walk %s: %w", homeRoot, err)

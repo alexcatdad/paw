@@ -33,11 +33,11 @@ type CommandCall struct {
 }
 
 type FakeRunner struct {
-	LookPathFn              func(file string) (string, error)
-	RunFn                   func(name string, args ...string) error
-	OutputFn                func(name string, args ...string) ([]byte, error)
-	CombinedOutputFn        func(name string, args ...string) ([]byte, error)
-	RunWithFn               func(name string, args []string, opts execx.CommandOptions) error
+	LookPathFn       func(file string) (string, error)
+	RunFn            func(name string, args ...string) error
+	OutputFn         func(name string, args ...string) ([]byte, error)
+	CombinedOutputFn func(name string, args ...string) ([]byte, error)
+	RunWithFn        func(name string, args []string, opts execx.CommandOptions) error
 
 	mu    sync.Mutex
 	Calls []CommandCall

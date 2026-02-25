@@ -87,7 +87,7 @@ func TestMkdirTempUsesRandomSuffix(t *testing.T) {
 		}
 	}
 
-	// The two paths must differ (os.MkdirTemp randomises the suffix; a
+	// The two paths must differ (os.MkdirTemp randomizes the suffix; a
 	// simple timestamp-based scheme reusing the same FakeClock instant
 	// would produce the same path both times).
 	if dirs[0] == dirs[1] {
