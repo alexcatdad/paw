@@ -32,6 +32,17 @@ go build -o dist/paw ./cmd/paw
 - Keep CLI behavior stable for existing commands.
 - Add tests for any behavior change.
 
+## Release Notes
+
+- `main` uses conventional commits for automatic semantic versioning:
+  - `feat:` => minor
+  - `fix:`, `perf:`, `refactor:` => patch
+  - `!` or `BREAKING CHANGE` => major
+- `docs:`, `ci:`, `chore:`, `test:`, and `style:` commits do not create a release.
+- Homebrew tap updates use a GitHub App token from:
+  - repo variable `APP_ID`
+  - repo secret `APP_SECRET`
+
 ## License
 
 MIT

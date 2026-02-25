@@ -129,6 +129,16 @@ Autofix command for local parity with CI bot:
 ./scripts/test/quality-fix.sh
 ```
 
+## Automated Releases
+
+- Releases are automatic on push to `main` using conventional commits:
+  - `feat:` => minor bump
+  - `fix:`, `perf:`, `refactor:` => patch bump
+  - `!` / `BREAKING CHANGE` => major bump
+  - `docs:`, `ci:`, `chore:`, `test:`, `style:` => no release
+- Release assets are published to GitHub Releases.
+- Homebrew formula `alexcatdad/tap/paw` is updated automatically from release assets.
+
 ## License
 
 MIT

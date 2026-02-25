@@ -1,6 +1,6 @@
 package cli
 
-var version = "0.2.0"
+var version = "dev"
 
 func Version() string {
 	return version
