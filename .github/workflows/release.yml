@@ -49,7 +49,7 @@ jobs:
           IFS='.' read -r major minor patch <<< "${version}"
 
           commits=$(git log "${latest_tag}"..HEAD --pretty=format:"%s" 2>/dev/null || git log --pretty=format:"%s")
-          bump="none"
+          bump="patch"  # default: any non-skip commit produces at least a patch release
           while IFS= read -r msg; do
             if echo "$msg" | grep -qE '^[a-z]+(\(.+\))?!:' || echo "$msg" | grep -qi 'BREAKING CHANGE'; then
               bump="major"
@@ -58,16 +58,7 @@ jobs:
             if echo "$msg" | grep -qE '^feat(\(.+\))?:'; then
               [[ "$bump" != "major" ]] && bump="minor"
             fi
-            if echo "$msg" | grep -qE '^(fix|perf|refactor)(\(.+\))?:'; then
-              [[ "$bump" == "none" ]] && bump="patch"
-            fi
           done <<< "${commits}"
-
-          if [[ "$bump" == "none" ]]; then
-            echo "No version-bumping commits found. Skipping."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
           case "$bump" in
             major) major=$((major + 1)); minor=0; patch=0 ;;
