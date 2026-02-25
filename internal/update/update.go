@@ -39,7 +39,7 @@ func CheckForUpdate(currentVersion string, force bool) (string, error) {
 		s, _ := loadState()
 		if s != nil {
 			last, err := time.Parse(time.RFC3339, s.LastCheck)
-			if err == nil && time.Since(last) < checkInterval {
+			if err == nil && getClk().Now().Sub(last) < checkInterval {
 				if compareVersions(currentVersion, s.LatestVersion) < 0 {
 					return s.LatestVersion, nil
 				}
