@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/alexcatdad/paw/internal/audit"
 	"github.com/alexcatdad/paw/internal/backup"
 	"github.com/alexcatdad/paw/internal/config"
+	"github.com/alexcatdad/paw/internal/drift"
 	"github.com/alexcatdad/paw/internal/hooks"
 	"github.com/alexcatdad/paw/internal/packages"
 	"github.com/alexcatdad/paw/internal/platform"
@@ -42,6 +44,36 @@ func newStatusCommand(opts *app.GlobalOptions) *cobra.Command {
 	return &cobra.Command{Use: "status", Short: "Show current symlink and package state", RunE: func(cmd *cobra.Command, args []string) error {
 		return runStatus(cmd, opts)
 	}}
+}
+
+func newDriftCommand(opts *app.GlobalOptions) *cobra.Command {
+	var scope string
+	driftCmd := &cobra.Command{
+		Use:   "drift",
+		Short: "Inspect and apply drift from system state to repo",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDriftStatus(cmd, opts, scope)
+		},
+	}
+	driftCmd.PersistentFlags().StringVar(&scope, "scope", string(drift.ScopeAll), "Drift scope: all|files|packages")
+
+	driftCmd.AddCommand(
+		&cobra.Command{
+			Use:   "status",
+			Short: "Inspect drift without applying changes",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				return runDriftStatus(cmd, opts, scope)
+			},
+		},
+		&cobra.Command{
+			Use:   "apply",
+			Short: "Apply drift into repo and relink managed targets",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				return runDriftApply(cmd, opts, scope)
+			},
+		},
+	)
+	return driftCmd
 }
 
 func newBackupCommand(opts *app.GlobalOptions) *cobra.Command {
@@ -418,6 +450,144 @@ func runStatus(cmd *cobra.Command, opts *app.GlobalOptions) error {
 			"Symlinks":     fmt.Sprintf("%d", len(last.Symlinks)),
 			"Backups":      fmt.Sprintf("%d", len(last.Backups)),
 		})
+	}
+	return nil
+}
+
+func runDriftStatus(cmd *cobra.Command, opts *app.GlobalOptions, scopeValue string) error {
+	logger := newLogger(opts)
+	repoDir, homeDir, _, entries, err := loadConfigEntries(logger)
+	if err != nil {
+		return err
+	}
+	scope, err := drift.ParseScope(scopeValue)
+	if err != nil {
+		return err
+	}
+	report, err := drift.Inspect(drift.Context{
+		Scope:    scope,
+		RepoPath: repoDir,
+		HomePath: homeDir,
+		Entries:  entries,
+		Logger:   logger,
+	})
+	if err != nil {
+		return err
+	}
+	if opts.JSON {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		enc.SetIndent("", "  ")
+		return enc.Encode(report)
+	}
+
+	logger.Header("Dotfiles Drift Status")
+	printSystemTable(logger, repoDir, homeDir)
+	logger.Table(map[string]string{
+		"Scope":         string(scope),
+		"Total drift":   fmt.Sprintf("%d", report.Summary.DriftCount),
+		"Files drift":   fmt.Sprintf("%d", report.Summary.FilesDrift),
+		"Package drift": fmt.Sprintf("%d", report.Summary.PackageDrift),
+	})
+	if len(report.Findings) == 0 {
+		logger.Success("No findings")
+		return nil
+	}
+	for _, finding := range report.Findings {
+		target := finding.TargetPath
+		if target == "" {
+			target = finding.SourcePath
+		}
+		applyability := "no"
+		if finding.CanApply {
+			applyability = "yes"
+		}
+		logger.Info(fmt.Sprintf("%s [%s] %s (apply=%s)", finding.Kind, finding.Scope, repo.ContractHome(target), applyability))
+		if finding.Details != "" {
+			logger.Info("  " + finding.Details)
+		}
+	}
+	if report.Summary.DriftCount > 0 {
+		return app.WithCode(app.ExitConflict, fmt.Errorf("drift detected: %d finding(s)", report.Summary.DriftCount))
+	}
+	logger.Success("No drift detected")
+	return nil
+}
+
+func runDriftApply(cmd *cobra.Command, opts *app.GlobalOptions, scopeValue string) error {
+	logger := newLogger(opts)
+	repoDir, homeDir, _, entries, err := loadConfigEntries(logger)
+	if err != nil {
+		return err
+	}
+	scope, err := drift.ParseScope(scopeValue)
+	if err != nil {
+		return err
+	}
+	result, err := drift.Apply(drift.Context{
+		Scope:    scope,
+		RepoPath: repoDir,
+		HomePath: homeDir,
+		Entries:  entries,
+		DryRun:   opts.DryRun,
+		Logger:   logger,
+	})
+	if err != nil {
+		return err
+	}
+	if opts.JSON {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(result); err != nil {
+			return err
+		}
+	} else {
+		logger.Header("Dotfiles Drift Apply")
+		logger.Table(map[string]string{
+			"Scope":           string(scope),
+			"Applied":         fmt.Sprintf("%d", len(result.Applied)),
+			"Skipped":         fmt.Sprintf("%d", len(result.Skipped)),
+			"Failed":          fmt.Sprintf("%d", len(result.Failed)),
+			"Remaining drift": fmt.Sprintf("%d", len(result.RemainingDrift)),
+		})
+		for _, finding := range result.Applied {
+			p := finding.TargetPath
+			if p == "" {
+				p = finding.SourcePath
+			}
+			if opts.DryRun {
+				logger.DryRun(fmt.Sprintf("Would apply %s on %s", finding.Kind, repo.ContractHome(p)))
+			} else {
+				logger.Success(fmt.Sprintf("Applied %s on %s", finding.Kind, repo.ContractHome(p)))
+			}
+		}
+		for _, finding := range result.Skipped {
+			p := finding.TargetPath
+			if p == "" {
+				p = finding.SourcePath
+			}
+			logger.Info(fmt.Sprintf("Skipped %s on %s", finding.Kind, repo.ContractHome(p)))
+		}
+		for _, finding := range result.Failed {
+			p := finding.TargetPath
+			if p == "" {
+				p = finding.SourcePath
+			}
+			logger.Warn(fmt.Sprintf("Failed %s on %s: %s", finding.Kind, repo.ContractHome(p), finding.Details))
+		}
+		for _, backupEntry := range result.Backups {
+			logger.Info(fmt.Sprintf("Backup created: %s", repo.ContractHome(backupEntry.Backup)))
+		}
+	}
+	if !opts.DryRun {
+		if err := saveDriftLastRun(result); err != nil {
+			logger.Warn("Failed to save drift apply state: " + err.Error())
+		}
+	}
+	if len(result.RemainingDrift) > 0 {
+		return app.WithCode(app.ExitConflict, fmt.Errorf("remaining drift: %d finding(s)", len(result.RemainingDrift)))
+	}
+	if !opts.JSON {
+		logger.Success("Drift apply complete")
 	}
 	return nil
 }

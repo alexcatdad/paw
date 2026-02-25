@@ -9,6 +9,7 @@ Available Commands:
   backup            Backup management
   completion        Generate shell completions
   doctor            Health check and diagnostics
+  drift             Inspect and apply drift from system state to repo
   help              Help about any command
   init              Clone dotfiles repo and configure paw
   install           Install packages and create symlinks

@@ -23,6 +23,7 @@ paw status
 - `paw link`
 - `paw unlink`
 - `paw status`
+- `paw drift status|apply`
 - `paw sync`
 - `paw push [message]`
 - `paw update`
@@ -77,6 +78,22 @@ home/.config/starship.toml    -> ~/.config/starship.toml
 ```
 
 Use `[overrides]` for exceptions and conditional links.
+
+## Drift Workflow
+
+Inspect and import drift from your current machine back into the repo.
+
+```bash
+paw drift status
+paw drift status --json
+paw drift apply
+paw drift apply --scope files
+```
+
+- `paw drift status` exits with code `5` when drift exists (cron/CI alerting).
+- `paw drift apply` updates repo files only and does not stage or commit.
+- Use `paw push` after apply when you want to commit and publish changes.
+- Package drift uses deterministic Homebrew export rewrite for `home/.config/homebrew/Brewfile`.
 
 ## Security Notes
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/alexcatdad/paw/internal/backup"
 	"github.com/alexcatdad/paw/internal/config"
+	"github.com/alexcatdad/paw/internal/drift"
 	"github.com/alexcatdad/paw/internal/output"
 	"github.com/alexcatdad/paw/internal/platform"
 	"github.com/alexcatdad/paw/internal/repo"
@@ -49,6 +50,34 @@ func saveLastRun(command string, states []symlink.State) error {
 		Command:   command,
 		Backups:   backups,
 		Symlinks:  backup.StatesToEntries(states),
+	}
+	return backup.SaveLastRun(last)
+}
+
+func saveDriftLastRun(result drift.ApplyResult) error {
+	symlinks := []backup.SymlinkEntry{}
+	seenTargets := map[string]struct{}{}
+	for _, finding := range result.Applied {
+		if finding.Scope != drift.ScopeFiles {
+			continue
+		}
+		if strings.TrimSpace(finding.SourcePath) == "" || strings.TrimSpace(finding.TargetPath) == "" {
+			continue
+		}
+		if _, exists := seenTargets[finding.TargetPath]; exists {
+			continue
+		}
+		seenTargets[finding.TargetPath] = struct{}{}
+		symlinks = append(symlinks, backup.SymlinkEntry{
+			Source: finding.SourcePath,
+			Target: finding.TargetPath,
+		})
+	}
+	last := backup.LastRunState{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Command:   "drift-apply",
+		Backups:   result.Backups,
+		Symlinks:  symlinks,
 	}
 	return backup.SaveLastRun(last)
 }

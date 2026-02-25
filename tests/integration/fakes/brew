@@ -10,6 +10,23 @@ if [[ "$*" == *"list --formula"* || "$*" == *"list --cask"* ]]; then
   exit 1
 fi
 
+if [[ "$*" == *"bundle dump"* ]]; then
+  dump_file=""
+  args=("$@")
+  for ((i=0; i<${#args[@]}; i++)); do
+    if [[ "${args[$i]}" == "--file" && $((i+1)) -lt ${#args[@]} ]]; then
+      dump_file="${args[$((i+1))]}"
+    fi
+  done
+  if [[ -z "${dump_file}" ]]; then
+    echo "missing --file for brew bundle dump" >&2
+    exit 1
+  fi
+  mkdir -p "$(dirname "${dump_file}")"
+  printf "%s" "${FAKE_BREW_DUMP_CONTENT:-brew \"ripgrep\"\n}" > "${dump_file}"
+  exit 0
+fi
+
 if [[ -n "${FAKE_BREW_FAIL:-}" ]]; then
   echo "${FAKE_BREW_FAIL}" >&2
   exit 1

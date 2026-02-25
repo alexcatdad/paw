@@ -1,12 +1,14 @@
 package integration_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/alexcatdad/paw/internal/cli"
 	"github.com/alexcatdad/paw/internal/config"
 	"github.com/alexcatdad/paw/internal/output"
 	"github.com/alexcatdad/paw/internal/packages"
@@ -26,6 +28,48 @@ func fakeBinDir(t *testing.T) string {
 func prependPath(t *testing.T, dir string) {
 	t.Helper()
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func runPawCommand(t *testing.T, repoDir string, home string, args ...string) error {
+	t.Helper()
+	t.Setenv("PAW_REPO", repoDir)
+	t.Setenv("HOME", home)
+	cmd := cli.NewRootCommand()
+	cmd.SetArgs(args)
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	return cmd.Execute()
+}
+
+func writeRepoFixture(t *testing.T, repoDir string) {
+	t.Helper()
+	content := `version = 1
+layout = "hybrid"
+
+[packages]
+common = []
+darwin = []
+linux_apt = []
+linux_brew = []
+wsl_apt = []
+wsl_brew = []
+
+[hooks]
+
+[ignore]
+paths = []
+
+[backup]
+enabled = true
+max_age = 30
+max_count = 5
+`
+	if err := os.WriteFile(filepath.Join(repoDir, "paw.toml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(repoDir, "home"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRepoPullUsesFakeGitBinary(t *testing.T) {
@@ -83,5 +127,66 @@ func TestPackagesInstallUsesFakeBinaries(t *testing.T) {
 	result := packages.InstallAll(cfg, packages.Options{DryRun: true}, logger)
 	if len(result.Installed) == 0 {
 		t.Fatalf("expected dry-run install to mark package installed, got %+v", result)
+	}
+}
+
+func TestDriftApplyFilesImportsAndRelinks(t *testing.T) {
+	home := t.TempDir()
+	repoDir := t.TempDir()
+	writeRepoFixture(t, repoDir)
+
+	source := filepath.Join(repoDir, "home", ".zshrc")
+	if err := os.WriteFile(source, []byte("repo"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(home, ".zshrc")
+	if err := os.WriteFile(target, []byte("local-change"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runPawCommand(t, repoDir, home, "drift", "apply", "--scope", "files"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(got)) != "local-change" {
+		t.Fatalf("expected source imported from target, got %q", string(got))
+	}
+	linkTarget, err := os.Readlink(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Clean(linkTarget) != filepath.Clean(source) {
+		t.Fatalf("expected relink to %s, got %s", source, linkTarget)
+	}
+}
+
+func TestDriftApplyPackagesRewritesBrewfile(t *testing.T) {
+	fakes := fakeBinDir(t)
+	prependPath(t, fakes)
+	t.Setenv("FAKE_BREW_DUMP_CONTENT", "brew \"fd\"\n")
+
+	home := t.TempDir()
+	repoDir := t.TempDir()
+	writeRepoFixture(t, repoDir)
+	tracked := filepath.Join(repoDir, "home", ".config", "homebrew", "Brewfile")
+	if err := os.MkdirAll(filepath.Dir(tracked), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tracked, []byte("brew \"ripgrep\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runPawCommand(t, repoDir, home, "drift", "apply", "--scope", "packages"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(tracked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(got)) != `brew "fd"` {
+		t.Fatalf("expected rewritten Brewfile, got %q", string(got))
 	}
 }

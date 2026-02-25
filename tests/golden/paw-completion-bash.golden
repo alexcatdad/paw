@@ -647,6 +647,134 @@ _paw_doctor()
     noun_aliases=()
 }
 
+_paw_drift_apply()
+{
+    last_command="paw_drift_apply"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--auto-update")
+    flags+=("--dry-run")
+    flags+=("-n")
+    flags+=("--force")
+    flags+=("-f")
+    flags+=("--json")
+    flags+=("--log-format=")
+    two_word_flags+=("--log-format")
+    flags+=("--no-interactive")
+    flags+=("--path=")
+    two_word_flags+=("--path")
+    two_word_flags+=("-p")
+    flags+=("--quiet")
+    flags+=("-q")
+    flags+=("--scope=")
+    two_word_flags+=("--scope")
+    flags+=("--skip-hooks")
+    flags+=("--skip-packages")
+    flags+=("--skip-update")
+    flags+=("--skip-verify")
+    flags+=("--verbose")
+    flags+=("-v")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_paw_drift_status()
+{
+    last_command="paw_drift_status"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--auto-update")
+    flags+=("--dry-run")
+    flags+=("-n")
+    flags+=("--force")
+    flags+=("-f")
+    flags+=("--json")
+    flags+=("--log-format=")
+    two_word_flags+=("--log-format")
+    flags+=("--no-interactive")
+    flags+=("--path=")
+    two_word_flags+=("--path")
+    two_word_flags+=("-p")
+    flags+=("--quiet")
+    flags+=("-q")
+    flags+=("--scope=")
+    two_word_flags+=("--scope")
+    flags+=("--skip-hooks")
+    flags+=("--skip-packages")
+    flags+=("--skip-update")
+    flags+=("--skip-verify")
+    flags+=("--verbose")
+    flags+=("-v")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_paw_drift()
+{
+    last_command="paw_drift"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("apply")
+    commands+=("status")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--scope=")
+    two_word_flags+=("--scope")
+    flags+=("--auto-update")
+    flags+=("--dry-run")
+    flags+=("-n")
+    flags+=("--force")
+    flags+=("-f")
+    flags+=("--json")
+    flags+=("--log-format=")
+    two_word_flags+=("--log-format")
+    flags+=("--no-interactive")
+    flags+=("--path=")
+    two_word_flags+=("--path")
+    two_word_flags+=("-p")
+    flags+=("--quiet")
+    flags+=("-q")
+    flags+=("--skip-hooks")
+    flags+=("--skip-packages")
+    flags+=("--skip-update")
+    flags+=("--skip-verify")
+    flags+=("--verbose")
+    flags+=("-v")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _paw_help()
 {
     last_command="paw_help"
@@ -1191,6 +1319,7 @@ _paw_root_command()
     commands+=("backup")
     commands+=("completion")
     commands+=("doctor")
+    commands+=("drift")
     commands+=("help")
     commands+=("init")
     commands+=("install")
