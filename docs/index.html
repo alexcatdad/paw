@@ -242,25 +242,28 @@
     <h2 id="config-heading" class="text-xs text-term-gray uppercase tracking-widest mb-3">Configuration</h2>
     <p class="text-term-dim text-sm mb-6">paw.toml in your repo</p>
     <div class="max-w-4xl">
-      <code-block>import type { DotfilesConfig } from "paw";
+      <code-block>version = 1
+layout = "hybrid"
 
-export default {
-  symlinks: {
-    "shell/zshrc": ".zshrc",
-    "git/gitconfig": ".gitconfig",
-    "starship/starship.toml": ".config/starship.toml",
-  },
-  packages: {
-    common: ["starship", "eza", "fzf", "zoxide", "ripgrep"],
-    darwin: ["coreutils"],
-    linux: { apt: ["build-essential"], brew: ["gcc"] },
-  },
-  hooks: {
-    postInstall: async (ctx) =&gt; {
-      console.log("dotfiles installed on", ctx.platform);
-    },
-  },
-} satisfies DotfilesConfig;</code-block>
+[packages]
+common = ["ripgrep", "fzf", "starship", "eza", "zoxide"]
+darwin = ["ghostty"]
+linux_apt = ["git", "curl"]
+linux_brew = []
+
+[ignore]
+paths = [".zshrc.local", ".gitconfig.local"]
+
+[backup]
+enabled = true
+max_age = 30
+max_count = 5
+
+[hooks]
+post_install = "echo installed"
+
+[overrides]
+"extras/ssh-config" = { target = ".ssh/config", platform = ["darwin", "linux", "wsl"] }</code-block>
     </div>
   </section>
 
