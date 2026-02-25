@@ -9,9 +9,26 @@ SUMMARY_FILE="${SECURITY_SUMMARY_FILE:-security-summary.json}"
 TARGET="${SECURITY_TARGET:-./...}"
 read -r -a security_targets <<< "${TARGET}"
 
-command -v jq >/dev/null 2>&1 || { echo "jq is required for security-gate.sh" >&2; exit 1; }
-command -v govulncheck >/dev/null 2>&1 || { echo "govulncheck is required for security-gate.sh" >&2; exit 1; }
-command -v gosec >/dev/null 2>&1 || { echo "gosec is required for security-gate.sh" >&2; exit 1; }
+resolve_bin() {
+  local name="$1"
+  local fallback="$2"
+  local found
+  found="$(command -v "${name}" || true)"
+  if [[ -n "${found}" ]]; then
+    printf "%s" "${found}"
+    return 0
+  fi
+  if [[ -x "${fallback}" ]]; then
+    printf "%s" "${fallback}"
+    return 0
+  fi
+  echo "${name} is required for security-gate.sh" >&2
+  exit 1
+}
+
+jq_bin="$(resolve_bin jq /usr/bin/jq)"
+govulncheck_bin="$(resolve_bin govulncheck /usr/local/bin/govulncheck)"
+gosec_bin="$(resolve_bin gosec /usr/local/bin/gosec)"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
@@ -20,7 +37,7 @@ govuln_json="${tmp_dir}/govuln.jsonl"
 gosec_json="${tmp_dir}/gosec.json"
 
 govuln_status=0
-govulncheck -json "${security_targets[@]}" >"${govuln_json}" 2>"${tmp_dir}/govuln.stderr" || govuln_status=$?
+"${govulncheck_bin}" -json "${security_targets[@]}" >"${govuln_json}" 2>"${tmp_dir}/govuln.stderr" || govuln_status=$?
 if [[ ${govuln_status} -ne 0 && ! -s "${govuln_json}" ]]; then
   echo "govulncheck failed to execute cleanly:" >&2
   cat "${tmp_dir}/govuln.stderr" >&2 || true
@@ -28,7 +45,7 @@ if [[ ${govuln_status} -ne 0 && ! -s "${govuln_json}" ]]; then
 fi
 
 gosec_status=0
-gosec -fmt=json -no-fail "${security_targets[@]}" >"${gosec_json}" 2>"${tmp_dir}/gosec.stderr" || gosec_status=$?
+"${gosec_bin}" -fmt=json -no-fail "${security_targets[@]}" >"${gosec_json}" 2>"${tmp_dir}/gosec.stderr" || gosec_status=$?
 if [[ ${gosec_status} -ne 0 && ! -s "${gosec_json}" ]]; then
   echo "gosec failed to execute cleanly:" >&2
   cat "${tmp_dir}/gosec.stderr" >&2 || true
@@ -36,29 +53,29 @@ if [[ ${gosec_status} -ne 0 && ! -s "${gosec_json}" ]]; then
 fi
 
 govuln_critical=$(
-  jq -s '[.[] | select(.osv != null) | (.osv.severity // [])[]? | .score? | tonumber? | select(. >= 9)] | length' "${govuln_json}"
+  "${jq_bin}" -s '[.[] | select(.osv != null) | (.osv.severity // [])[]? | .score? | tonumber? | select(. >= 9)] | length' "${govuln_json}"
 )
 govuln_high=$(
-  jq -s '[.[] | select(.osv != null) | (.osv.severity // [])[]? | .score? | tonumber? | select(. >= 7 and . < 9)] | length' "${govuln_json}"
+  "${jq_bin}" -s '[.[] | select(.osv != null) | (.osv.severity // [])[]? | .score? | tonumber? | select(. >= 7 and . < 9)] | length' "${govuln_json}"
 )
 govuln_medium_low=$(
-  jq -s '[.[] | select(.osv != null) | (.osv.severity // [])[]? | .score? | tonumber? | select(. < 7)] | length' "${govuln_json}"
+  "${jq_bin}" -s '[.[] | select(.osv != null) | (.osv.severity // [])[]? | .score? | tonumber? | select(. < 7)] | length' "${govuln_json}"
 )
 govuln_unknown=$(
-  jq -s '[.[] | select(.osv != null) | select((.osv.severity // []) | length == 0)] | length' "${govuln_json}"
+  "${jq_bin}" -s '[.[] | select(.osv != null) | select((.osv.severity // []) | length == 0)] | length' "${govuln_json}"
 )
 
 gosec_critical=$(
-  jq '[.Issues[]? | select((.severity // "" | ascii_upcase) == "CRITICAL")] | length' "${gosec_json}"
+  "${jq_bin}" '[.Issues[]? | select((.severity // "" | ascii_upcase) == "CRITICAL")] | length' "${gosec_json}"
 )
 gosec_high=$(
-  jq '[.Issues[]? | select((.severity // "" | ascii_upcase) == "HIGH")] | length' "${gosec_json}"
+  "${jq_bin}" '[.Issues[]? | select((.severity // "" | ascii_upcase) == "HIGH")] | length' "${gosec_json}"
 )
 gosec_medium_low=$(
-  jq '[.Issues[]? | select((.severity // "" | ascii_upcase) == "MEDIUM" or (.severity // "" | ascii_upcase) == "LOW")] | length' "${gosec_json}"
+  "${jq_bin}" '[.Issues[]? | select((.severity // "" | ascii_upcase) == "MEDIUM" or (.severity // "" | ascii_upcase) == "LOW")] | length' "${gosec_json}"
 )
 
-jq -n \
+"${jq_bin}" -n \
   --arg threshold "${SEVERITY_THRESHOLD}" \
   --argjson govuln_critical "${govuln_critical}" \
   --argjson govuln_high "${govuln_high}" \

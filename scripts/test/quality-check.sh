@@ -11,14 +11,31 @@ RUN_VULNCHECK="${RUN_VULNCHECK:-1}"
 SEVERITY_THRESHOLD="${SEVERITY_THRESHOLD:-high}"
 read -r -a lint_targets <<< "${LINT_TARGET}"
 
-command -v go >/dev/null 2>&1 || { echo "go is required" >&2; exit 1; }
-command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint is required" >&2; exit 1; }
-command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck is required" >&2; exit 1; }
-command -v actionlint >/dev/null 2>&1 || { echo "actionlint is required" >&2; exit 1; }
+resolve_bin() {
+  local name="$1"
+  local fallback="$2"
+  local found
+  found="$(command -v "${name}" || true)"
+  if [[ -n "${found}" ]]; then
+    printf "%s" "${found}"
+    return 0
+  fi
+  if [[ -x "${fallback}" ]]; then
+    printf "%s" "${fallback}"
+    return 0
+  fi
+  echo "${name} is required" >&2
+  exit 1
+}
+
+go_bin="$(resolve_bin go /usr/local/go/bin/go)"
+golangci_lint_bin="$(resolve_bin golangci-lint /usr/local/bin/golangci-lint)"
+shellcheck_bin="$(resolve_bin shellcheck /usr/bin/shellcheck)"
+actionlint_bin="$(resolve_bin actionlint /usr/local/bin/actionlint)"
 
 gofmt_bin="$(command -v gofmt || true)"
 if [[ -z "${gofmt_bin}" ]]; then
-  gofmt_bin="$(go env GOROOT)/bin/gofmt"
+  gofmt_bin="$("${go_bin}" env GOROOT)/bin/gofmt"
 fi
 if [[ ! -x "${gofmt_bin}" ]]; then
   echo "gofmt is required" >&2
@@ -35,14 +52,14 @@ if [[ -n "${unformatted}" ]]; then
 fi
 
 echo "go vet..."
-go vet "${lint_targets[@]}"
+"${go_bin}" vet "${lint_targets[@]}"
 
 echo "golangci-lint..."
 lint_args=(run --timeout "${LINT_TIMEOUT}" "${lint_targets[@]}")
 if [[ "${QUALITY_STAGE}" == "strict" ]]; then
   lint_args+=(-E errcheck -E gocritic -E revive -E unconvert -E unparam)
 fi
-golangci-lint "${lint_args[@]}"
+"${golangci_lint_bin}" "${lint_args[@]}"
 
 echo "shellcheck..."
 mapfile -t shell_files < <(find scripts -type f -name "*.sh" | sort)
@@ -50,11 +67,11 @@ if [[ -f "install.sh" ]]; then
   shell_files+=("install.sh")
 fi
 if (( ${#shell_files[@]} > 0 )); then
-  shellcheck -S warning "${shell_files[@]}"
+  "${shellcheck_bin}" -S warning "${shell_files[@]}"
 fi
 
 echo "actionlint..."
-actionlint
+"${actionlint_bin}"
 
 if [[ "${RUN_VULNCHECK}" == "1" ]]; then
   echo "security gate..."
