@@ -92,7 +92,9 @@ func InstallAll(cfg config.PackageConfig, opts Options, logger *output.Logger) R
 	}
 
 	if current == platform.Linux || current == platform.WSL {
-		_ = installFont(cfg, brewPath, opts.DryRun, logger)
+		if err := installFont(cfg, brewPath, opts.DryRun, logger); err != nil {
+			logger.Warn(fmt.Sprintf("Font installation skipped: %v", err))
+		}
 	}
 
 	return result

@@ -150,11 +150,11 @@ func TestAttestationWarningWhenUnavailable(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Stderr = w
+	defer func() { os.Stderr = oldStderr }()
 
 	performErr := Perform("1.0.0", Options{ForceCheck: true}, logger)
 
 	w.Close()
-	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, r); err != nil {

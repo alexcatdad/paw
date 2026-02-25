@@ -1,5 +1,7 @@
 package app
 
+import "errors"
+
 type codedError struct {
 	code int
 	err  error
@@ -24,7 +26,8 @@ func ExitCode(err error) int {
 	if err == nil {
 		return ExitOK
 	}
-	if ce, ok := err.(codedError); ok {
+	var ce codedError
+	if errors.As(err, &ce) {
 		return ce.code
 	}
 	return ExitSystem

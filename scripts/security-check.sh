@@ -60,7 +60,7 @@ done
 # Check for email addresses (excluding obvious fake/example ones)
 # ─────────────────────────────────────────────────────────────────────────────
 echo "Checking for email addresses..."
-EMAIL_MATCHES=$(printf '%s\n' "${FILES[@]}" | xargs grep -l -E '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' 2>/dev/null | grep -v -E '(security-check\.sh|\.md|package\.json)$' || true)
+EMAIL_MATCHES=$(printf '%s\0' "${FILES[@]}" | xargs -0 grep -l -E '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' 2>/dev/null | grep -v -E '(security-check\.sh|\.md|package\.json)$' || true)
 
 if [ -n "$EMAIL_MATCHES" ]; then
     for file in $EMAIL_MATCHES; do
@@ -83,7 +83,7 @@ fi
 # Check for IP addresses (excluding localhost and common examples)
 # ─────────────────────────────────────────────────────────────────────────────
 echo "Checking for IP addresses..."
-IP_MATCHES=$(printf '%s\n' "${FILES[@]}" | xargs grep -l -E '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' 2>/dev/null | grep -v -E '(security-check\.sh|\.md)$' || true)
+IP_MATCHES=$(printf '%s\0' "${FILES[@]}" | xargs -0 grep -l -E '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' 2>/dev/null | grep -v -E '(security-check\.sh|\.md)$' || true)
 
 if [ -n "$IP_MATCHES" ]; then
     for file in $IP_MATCHES; do
@@ -112,7 +112,7 @@ KEY_PATTERNS=(
 )
 
 for pattern in "${KEY_PATTERNS[@]}"; do
-    MATCHES=$(printf '%s\n' "${FILES[@]}" | xargs grep -l "$pattern" 2>/dev/null | grep -v 'security-check\.sh' || true)
+    MATCHES=$(printf '%s\0' "${FILES[@]}" | xargs -0 grep -l "$pattern" 2>/dev/null | grep -v 'security-check\.sh' || true)
     if [ -n "$MATCHES" ]; then
         echo -e "${RED}Found private keys:${NC}"
         echo "$MATCHES" | sed 's/^/  /'
@@ -131,7 +131,7 @@ AWS_PATTERNS=(
 )
 
 for pattern in "${AWS_PATTERNS[@]}"; do
-    MATCHES=$(printf '%s\n' "${FILES[@]}" | xargs grep -l -E "$pattern" 2>/dev/null | grep -v -E '(security-check\.sh|\.md)$' || true)
+    MATCHES=$(printf '%s\0' "${FILES[@]}" | xargs -0 grep -l -E "$pattern" 2>/dev/null | grep -v -E '(security-check\.sh|\.md)$' || true)
     if [ -n "$MATCHES" ]; then
         echo -e "${RED}Found potential AWS credentials:${NC}"
         echo "$MATCHES" | sed 's/^/  /'
@@ -150,7 +150,7 @@ API_PATTERNS=(
 )
 
 for pattern in "${API_PATTERNS[@]}"; do
-    MATCHES=$(printf '%s\n' "${FILES[@]}" | xargs grep -l -iE "$pattern" 2>/dev/null | grep -v -E '(security-check\.sh|\.md)$' || true)
+    MATCHES=$(printf '%s\0' "${FILES[@]}" | xargs -0 grep -l -iE "$pattern" 2>/dev/null | grep -v -E '(security-check\.sh|\.md)$' || true)
     if [ -n "$MATCHES" ]; then
         echo -e "${YELLOW}Potential API keys in:${NC}"
         echo "$MATCHES" | sed 's/^/  /'

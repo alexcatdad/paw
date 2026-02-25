@@ -49,7 +49,7 @@ func SaveLastRun(st LastRunState) error {
 	if err != nil {
 		return err
 	}
-	return getFsys().WriteFile(path, payload, 0o644)
+	return getFsys().WriteFile(path, payload, 0o600)
 }
 
 func LoadLastRun() (*LastRunState, error) {

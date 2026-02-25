@@ -59,7 +59,10 @@ func RunInit(repoURL string, opts InitOptions, logger *output.Logger) (bool, err
 			existing := strings.TrimSpace(string(remote))
 			if normalizeGitURL(existing) == normalizeGitURL(repoURL) {
 				logger.Info("Repository already exists, pulling latest")
-				_ = getRunner().RunContext(ctx, "git", "-C", clonePath, "pull", "--rebase")
+				if err := getRunner().RunContext(ctx, "git", "-C", clonePath, "pull", "--rebase"); err != nil {
+				logger.Warn(fmt.Sprintf("failed to update existing repository: %v - run 'git pull' manually to resolve conflicts", err))
+				return false, fmt.Errorf("failed to update existing repository: %w - run 'git pull' manually to resolve conflicts", err)
+			}
 			} else {
 				return false, fmt.Errorf("directory exists with different remote: %s", existing)
 			}

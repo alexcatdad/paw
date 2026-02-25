@@ -130,6 +130,7 @@ func Perform(currentVersion string, opts Options, logger *output.Logger) error {
 		return err
 	}
 	if err := getFsys().Chmod(binaryPath, 0o755); err != nil {
+		_ = getFsys().Rename(backup, binaryPath)
 		return err
 	}
 	if out, err := getRunner().CombinedOutput(binaryPath, "--version"); err != nil {

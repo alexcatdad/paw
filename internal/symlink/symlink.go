@@ -514,14 +514,26 @@ func acquireLock() (func(), error) {
 	// Fix I4: use 0o600 instead of 0o644.
 	f, err := getFsys().OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err == nil {
-		_, _ = f.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid()))
-		_ = f.Close()
+		if _, werr := f.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid())); werr != nil {
+			_ = f.Close()
+			_ = getFsys().Remove(lockPath)
+			return nil, fmt.Errorf("failed to write lock file: %w", werr)
+		}
+		if cerr := f.Close(); cerr != nil {
+			_ = getFsys().Remove(lockPath)
+			return nil, fmt.Errorf("failed to close lock file: %w", cerr)
+		}
 		return func() { _ = getFsys().Remove(lockPath) }, nil
 	}
 
 	// Fix I1: stale lock recovery.
-	// The lock file already exists. Determine whether the owning process is
-	// still alive before refusing to proceed.
+	// The lock file already exists (EEXIST). For any other error (permissions,
+	// path issues), fail immediately with a descriptive message.
+	if !os.IsExist(err) {
+		return nil, fmt.Errorf("failed to create lock file: %w", err)
+	}
+
+	// Determine whether the owning process is still alive before refusing to proceed.
 	pid, parseErr := readPIDFromLockFile(lockPath)
 	if parseErr != nil {
 		// Cannot read/parse lock file — treat as a live lock to be safe.
@@ -541,8 +553,15 @@ func acquireLock() (func(), error) {
 	if err != nil {
 		return nil, fmt.Errorf("another paw operation is running")
 	}
-	_, _ = f.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid()))
-	_ = f.Close()
+	if _, werr := f.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid())); werr != nil {
+		_ = f.Close()
+		_ = getFsys().Remove(lockPath)
+		return nil, fmt.Errorf("failed to write lock file: %w", werr)
+	}
+	if cerr := f.Close(); cerr != nil {
+		_ = getFsys().Remove(lockPath)
+		return nil, fmt.Errorf("failed to close lock file: %w", cerr)
+	}
 	return func() { _ = getFsys().Remove(lockPath) }, nil
 }
 
@@ -555,7 +574,7 @@ func saveTransaction(txn transaction) error {
 	if err != nil {
 		return err
 	}
-	return getFsys().WriteFile(path, payload, 0o644)
+	return getFsys().WriteFile(path, payload, 0o600)
 }
 
 func cleanupTransactionFile() {

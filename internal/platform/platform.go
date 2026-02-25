@@ -70,14 +70,15 @@ func MatchPlatform(allowed []string, current string) bool {
 }
 
 func MatchHostname(pattern string, hostname string) bool {
-	if strings.TrimSpace(pattern) == "" || pattern == "*" {
+	normalizedPattern := strings.TrimSpace(pattern)
+	if normalizedPattern == "" || normalizedPattern == "*" {
 		return true
 	}
 	// Use filepath.Match for proper glob semantics
-	matched, err := filepath.Match(strings.ToLower(pattern), strings.ToLower(hostname))
+	matched, err := filepath.Match(strings.ToLower(normalizedPattern), strings.ToLower(hostname))
 	if err != nil {
 		// Invalid pattern - fall back to exact match
-		return strings.EqualFold(pattern, hostname)
+		return strings.EqualFold(normalizedPattern, hostname)
 	}
 	return matched
 }
