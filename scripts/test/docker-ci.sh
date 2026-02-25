@@ -19,6 +19,7 @@ docker run --rm \
   -e LANG=C.UTF-8 \
   -e LC_ALL=C.UTF-8 \
   -e HOME=/tmp/paw-home \
+  -e PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   -v "${ROOT_DIR}:/workspace" \
   -w /workspace \
   "${IMAGE_TAG}" \

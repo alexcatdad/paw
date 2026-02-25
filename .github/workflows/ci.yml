@@ -21,6 +21,7 @@ jobs:
             -e SEVERITY_THRESHOLD=high \
             -e QUALITY_STAGE=baseline \
             -e HOME=/tmp/paw-home \
+            -e PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             paw-quality-env:local \
