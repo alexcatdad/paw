@@ -1,8 +1,24 @@
 FROM golang:1.26.0
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git curl unzip ca-certificates bash coreutils diffutils && \
+    apt-get install -y --no-install-recommends git curl unzip ca-certificates bash coreutils diffutils shellcheck jq && \
     rm -rf /var/lib/apt/lists/*
+
+ARG GOLANGCI_LINT_VERSION=v1.64.8
+ARG ACTIONLINT_VERSION=v1.7.8
+ARG GOVULNCHECK_VERSION=v1.1.4
+ARG GOSEC_VERSION=v2.22.2
+ARG GOIMPORTS_VERSION=v0.38.0
+
+RUN curl -sSfL "https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh" | sh -s -- -b /usr/local/bin "${GOLANGCI_LINT_VERSION}" && \
+    go install golang.org/x/vuln/cmd/govulncheck@"${GOVULNCHECK_VERSION}" && \
+    go install github.com/securego/gosec/v2/cmd/gosec@"${GOSEC_VERSION}" && \
+    go install github.com/rhysd/actionlint/cmd/actionlint@"${ACTIONLINT_VERSION}" && \
+    go install golang.org/x/tools/cmd/goimports@"${GOIMPORTS_VERSION}" && \
+    cp /go/bin/govulncheck /usr/local/bin/govulncheck && \
+    cp /go/bin/gosec /usr/local/bin/gosec && \
+    cp /go/bin/actionlint /usr/local/bin/actionlint && \
+    cp /go/bin/goimports /usr/local/bin/goimports
 
 ENV TZ=UTC \
     LANG=C.UTF-8 \

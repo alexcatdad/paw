@@ -1,0 +1,46 @@
+name: Autofix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autofix:
+    name: Autofix Quality
+    runs-on: ubuntu-latest
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Build autofix image
+        run: docker build -f tests/docker/Dockerfile.test -t paw-autofix-env:local .
+
+      - name: Run autofix
+        run: |
+          docker run --rm \
+            -e HOME=/tmp/paw-home \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            paw-autofix-env:local \
+            bash -lc "./scripts/test/quality-fix.sh"
+
+      - name: Commit and push fixes
+        run: |
+          if git diff --quiet; then
+            echo "No autofix changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(ci): apply automatic quality fixes"
+          git push

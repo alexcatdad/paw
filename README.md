@@ -115,6 +115,20 @@ Coverage stage gate (`65`, `80`, `90`) and package minima:
 COVERAGE_STAGE=65 ./scripts/test/coverage-check.sh
 ```
 
+Quality checks (formatting, vet, lint, shell/workflow lint, and security gate):
+
+```bash
+./scripts/test/quality-check.sh
+```
+
+Security gate policy blocks `HIGH`/`CRITICAL` findings and warns on lower severities.
+
+Autofix command for local parity with CI bot:
+
+```bash
+./scripts/test/quality-fix.sh
+```
+
 ## License
 
 MIT

@@ -15,7 +15,16 @@ go build ./cmd/paw
 go test ./...
 go test ./... -coverprofile=coverage.out
 go build -o dist/paw ./cmd/paw
+./scripts/test/quality-check.sh
+./scripts/test/quality-fix.sh
 ```
+
+## Quality + Security Gates
+
+- CI blocks on formatting drift, `go vet`, `golangci-lint`, `shellcheck`, and `actionlint`.
+- Security checks run through `govulncheck` + `gosec` and block on `HIGH`/`CRITICAL`.
+- Lower-severity security findings are surfaced as warnings and artifacts.
+- PR autofix workflow can commit safe formatting/lint fixes for same-repo branches.
 
 ## Expectations
 
