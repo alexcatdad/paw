@@ -49,7 +49,7 @@ func SaveLastRun(st LastRunState) error {
 	if err != nil {
 		return err
 	}
-	return fsys.WriteFile(path, payload, 0o644)
+	return getFsys().WriteFile(path, payload, 0o600)
 }
 
 func LoadLastRun() (*LastRunState, error) {
@@ -59,7 +59,7 @@ func LoadLastRun() (*LastRunState, error) {
 		if err != nil {
 			continue
 		}
-		data, err := fsys.ReadFile(path)
+		data, err := getFsys().ReadFile(path)
 		if err != nil {
 			continue
 		}
@@ -80,7 +80,7 @@ func FindAll(homeDir string) ([]BackupEntry, error) {
 	}
 	result := []BackupEntry{}
 	for _, dir := range dirs {
-		entries, err := fsys.ReadDir(dir)
+		entries, err := getFsys().ReadDir(dir)
 		if err != nil {
 			continue
 		}
@@ -153,8 +153,8 @@ func Restore(path string, dryRun bool, logger *output.Logger) error {
 		logger.DryRun(fmt.Sprintf("Would restore %s", repo.ContractHome(original)))
 		return nil
 	}
-	_ = fsys.Remove(original)
-	if err := fsys.Rename(resolved, original); err != nil {
+	_ = getFsys().Remove(original)
+	if err := getFsys().Rename(resolved, original); err != nil {
 		return err
 	}
 	logger.Success(fmt.Sprintf("Restored %s", repo.ContractHome(original)))
@@ -170,7 +170,7 @@ func Clean(cfg config.BackupConfig, dryRun bool, logger *output.Logger) (int, er
 	if err != nil {
 		return 0, err
 	}
-	cutoff := clk.Now().Add(-time.Duration(cfg.MaxAge) * 24 * time.Hour).UnixMilli()
+	cutoff := getClk().Now().Add(-time.Duration(cfg.MaxAge) * 24 * time.Hour).UnixMilli()
 	grouped := map[string][]BackupEntry{}
 	for _, b := range backups {
 		grouped[b.Original] = append(grouped[b.Original], b)
@@ -186,7 +186,7 @@ func Clean(cfg config.BackupConfig, dryRun bool, logger *output.Logger) (int, er
 				logger.DryRun(fmt.Sprintf("Would remove %s", repo.ContractHome(item.Backup)))
 				continue
 			}
-			if err := fsys.Remove(item.Backup); err == nil {
+			if err := getFsys().Remove(item.Backup); err == nil {
 				removed++
 			}
 		}
@@ -210,21 +210,21 @@ func Rollback(cfg config.Config, opts Options, logger *output.Logger) error {
 			logger.DryRun(fmt.Sprintf("Would remove symlink %s", repo.ContractHome(link.Target)))
 			continue
 		}
-		_ = fsys.Remove(link.Target)
+		_ = getFsys().Remove(link.Target)
 	}
 	for _, backup := range lastRun.Backups {
 		if opts.DryRun {
 			logger.DryRun(fmt.Sprintf("Would restore %s", repo.ContractHome(backup.Original)))
 			continue
 		}
-		_ = fsys.Remove(backup.Original)
-		if err := fsys.Rename(backup.Backup, backup.Original); err != nil {
+		_ = getFsys().Remove(backup.Original)
+		if err := getFsys().Rename(backup.Backup, backup.Original); err != nil {
 			logger.Warn(fmt.Sprintf("Failed to restore %s: %v", repo.ContractHome(backup.Original), err))
 		}
 	}
 	if !opts.DryRun {
 		if path, err := state.LastRunPath(); err == nil {
-			_ = fsys.Remove(path)
+			_ = getFsys().Remove(path)
 		}
 	}
 	if err := hooks.Run("post_rollback", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {

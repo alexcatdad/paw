@@ -1,8 +1,14 @@
 package repo
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
+)
+
+const (
+	gitOpTimeout = 2 * time.Minute
 )
 
 type SyncResult struct {
@@ -13,8 +19,11 @@ type SyncResult struct {
 }
 
 func RepoStatus(repoDir string) (behind bool, ahead bool, commits int, err error) {
-	_ = runner.Run("git", "-C", repoDir, "fetch", "origin", "--quiet")
-	out, err := runner.CombinedOutput("git", "-C", repoDir, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	ctx, cancel := context.WithTimeout(context.Background(), gitOpTimeout)
+	defer cancel()
+	_ = getRunner().RunContext(ctx, "git", "-C", repoDir, "fetch", "origin", "--quiet")
+
+	out, err := getRunner().CombinedOutput("git", "-C", repoDir, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	if err != nil {
 		return false, false, 0, nil
 	}
@@ -27,32 +36,35 @@ func PullRepo(repoDir string, dryRun bool) ([]string, error) {
 	if dryRun {
 		return []string{}, nil
 	}
-	oldHead, _ := runner.Output("git", "-C", repoDir, "rev-parse", "HEAD")
-	statusOut, _ := runner.Output("git", "-C", repoDir, "status", "--porcelain")
+	oldHead, _ := getRunner().Output("git", "-C", repoDir, "rev-parse", "HEAD")
+	statusOut, _ := getRunner().Output("git", "-C", repoDir, "status", "--porcelain")
 	hasChanges := strings.TrimSpace(string(statusOut)) != ""
 	if hasChanges {
-		_ = runner.Run("git", "-C", repoDir, "stash", "push", "-m", "paw-sync-auto-stash")
+		_ = getRunner().Run("git", "-C", repoDir, "stash", "push", "-m", "paw-sync-auto-stash")
 	}
-	pullOut, err := runner.CombinedOutput("git", "-C", repoDir, "pull", "--rebase", "--quiet")
+
+	pullCtx, pullCancel := context.WithTimeout(context.Background(), gitOpTimeout)
+	defer pullCancel()
+	pullOut, err := getRunner().CombinedOutputContext(pullCtx, "git", "-C", repoDir, "pull", "--rebase", "--quiet")
 	if err != nil {
 		stderr := strings.ToLower(string(pullOut))
 		if strings.Contains(stderr, "conflict") {
-			_ = runner.Run("git", "-C", repoDir, "rebase", "--abort")
+			_ = getRunner().Run("git", "-C", repoDir, "rebase", "--abort")
 			if hasChanges {
-				_ = runner.Run("git", "-C", repoDir, "stash", "pop")
+				_ = getRunner().Run("git", "-C", repoDir, "stash", "pop")
 			}
 			return nil, nil
 		}
 		return nil, err
 	}
 	if hasChanges {
-		_ = runner.Run("git", "-C", repoDir, "stash", "pop")
+		_ = getRunner().Run("git", "-C", repoDir, "stash", "pop")
 	}
-	newHead, _ := runner.Output("git", "-C", repoDir, "rev-parse", "HEAD")
+	newHead, _ := getRunner().Output("git", "-C", repoDir, "rev-parse", "HEAD")
 	if strings.TrimSpace(string(oldHead)) == strings.TrimSpace(string(newHead)) {
 		return []string{}, nil
 	}
-	diff, err := runner.Output("git", "-C", repoDir, "diff", "--name-only", strings.TrimSpace(string(oldHead)), strings.TrimSpace(string(newHead)))
+	diff, err := getRunner().Output("git", "-C", repoDir, "diff", "--name-only", strings.TrimSpace(string(oldHead)), strings.TrimSpace(string(newHead)))
 	if err != nil {
 		return []string{}, nil
 	}

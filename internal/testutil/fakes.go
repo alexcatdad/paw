@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -65,12 +66,22 @@ func (f *FakeRunner) Run(name string, args ...string) error {
 	return nil
 }
 
+// RunContext delegates to Run; timeouts are irrelevant in tests.
+func (f *FakeRunner) RunContext(_ context.Context, name string, args ...string) error {
+	return f.Run(name, args...)
+}
+
 func (f *FakeRunner) Output(name string, args ...string) ([]byte, error) {
 	f.record(name, args...)
 	if f.OutputFn != nil {
 		return f.OutputFn(name, args...)
 	}
 	return []byte{}, nil
+}
+
+// OutputContext delegates to Output; timeouts are irrelevant in tests.
+func (f *FakeRunner) OutputContext(_ context.Context, name string, args ...string) ([]byte, error) {
+	return f.Output(name, args...)
 }
 
 func (f *FakeRunner) CombinedOutput(name string, args ...string) ([]byte, error) {
@@ -81,12 +92,22 @@ func (f *FakeRunner) CombinedOutput(name string, args ...string) ([]byte, error)
 	return []byte{}, nil
 }
 
+// CombinedOutputContext delegates to CombinedOutput; timeouts are irrelevant in tests.
+func (f *FakeRunner) CombinedOutputContext(_ context.Context, name string, args ...string) ([]byte, error) {
+	return f.CombinedOutput(name, args...)
+}
+
 func (f *FakeRunner) RunWith(name string, args []string, opts execx.CommandOptions) error {
 	f.record(name, args...)
 	if f.RunWithFn != nil {
 		return f.RunWithFn(name, args, opts)
 	}
 	return nil
+}
+
+// RunWithContext delegates to RunWith; timeouts are irrelevant in tests.
+func (f *FakeRunner) RunWithContext(_ context.Context, name string, args []string, opts execx.CommandOptions) error {
+	return f.RunWith(name, args, opts)
 }
 
 func (f *FakeRunner) JoinedCalls() string {

@@ -1,14 +1,18 @@
 package repo
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/alexcatdad/paw/internal/output"
 )
+
+const cloneTimeout = 3 * time.Minute
 
 var (
 	httpsRepoPattern = regexp.MustCompile(`^https?://[^/]+/.+`)
@@ -46,13 +50,19 @@ func RunInit(repoURL string, opts InitOptions, logger *output.Logger) (bool, err
 		return true, nil
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), cloneTimeout)
+	defer cancel()
+
 	if st, err := os.Stat(clonePath); err == nil && st.IsDir() {
-		remote, remoteErr := runner.Output("git", "-C", clonePath, "remote", "get-url", "origin")
+		remote, remoteErr := getRunner().Output("git", "-C", clonePath, "remote", "get-url", "origin")
 		if remoteErr == nil {
 			existing := strings.TrimSpace(string(remote))
 			if normalizeGitURL(existing) == normalizeGitURL(repoURL) {
 				logger.Info("Repository already exists, pulling latest")
-				_ = runner.Run("git", "-C", clonePath, "pull", "--rebase")
+				if err := getRunner().RunContext(ctx, "git", "-C", clonePath, "pull", "--rebase"); err != nil {
+					logger.Warn(fmt.Sprintf("failed to update existing repository: %v - run 'git pull' manually to resolve conflicts", err))
+					return false, fmt.Errorf("failed to update existing repository: %w - run 'git pull' manually to resolve conflicts", err)
+				}
 			} else {
 				return false, fmt.Errorf("directory exists with different remote: %s", existing)
 			}
@@ -60,7 +70,7 @@ func RunInit(repoURL string, opts InitOptions, logger *output.Logger) (bool, err
 			return false, fmt.Errorf("directory exists but is not a git repository: %s", clonePath)
 		}
 	} else {
-		if err := runner.Run("git", "clone", repoURL, clonePath); err != nil {
+		if err := getRunner().RunContext(ctx, "git", "clone", repoURL, clonePath); err != nil {
 			return false, err
 		}
 	}

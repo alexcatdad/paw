@@ -1,9 +1,13 @@
 package hooks
 
 import (
+	"bufio"
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alexcatdad/paw/internal/config"
 	"github.com/alexcatdad/paw/internal/execx"
@@ -12,9 +16,30 @@ import (
 	"github.com/alexcatdad/paw/internal/repo"
 )
 
+const hookTimeout = 5 * time.Minute
+
 type Options struct {
 	DryRun    bool
 	SkipHooks bool
+	// Confirm, when true, prompts the user before executing each hook.
+	// Used during paw init to guard against supply-chain attacks from
+	// freshly cloned, untrusted repos.
+	Confirm bool
+	// Stdin is used for confirmation prompts. When nil, os.Stdin is used.
+	Stdin io.Reader
+}
+
+// filterEnv returns a copy of env with every entry whose key starts with
+// prefix removed. This prevents duplicates when the caller later appends
+// its own authoritative values for that prefix.
+func filterEnv(env []string, prefix string) []string {
+	out := make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func Run(name string, cfg config.Config, opts Options, logger *output.Logger) error {
@@ -32,14 +57,34 @@ func Run(name string, cfg config.Config, opts Options, logger *output.Logger) er
 		logger.DryRun(fmt.Sprintf("Would run hook: %s", cmdText))
 		return nil
 	}
+
+	if opts.Confirm {
+		fmt.Printf("Run hook '%s': %s? [y/N] ", name, cmdText)
+		stdin := opts.Stdin
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		scanner := bufio.NewScanner(stdin)
+		scanner.Scan()
+		answer := strings.TrimSpace(scanner.Text())
+		if answer != "y" && answer != "Y" {
+			logger.Warn(fmt.Sprintf("hook %s skipped by user", name))
+			return nil
+		}
+	}
+
 	home, _ := repo.HomeDir()
 	repoDir, _ := repo.RepoDir()
-	env := append(os.Environ(),
+	base := filterEnv(os.Environ(), "PAW_")
+	env := append(base,
 		"PAW_PLATFORM="+platform.Current(),
 		"PAW_HOME="+home,
 		"PAW_REPO="+repoDir,
 	)
-	if err := runner.RunWith("sh", []string{"-c", cmdText}, execx.CommandOptions{
+
+	ctx, cancel := context.WithTimeout(context.Background(), hookTimeout)
+	defer cancel()
+	if err := getRunner().RunWithContext(ctx, "sh", []string{"-c", cmdText}, execx.CommandOptions{
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 		Env:    env,

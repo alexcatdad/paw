@@ -1,8 +1,10 @@
 package update
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,6 +16,11 @@ import (
 
 const repoName = "alexcatdad/paw"
 const checkInterval = 24 * time.Hour
+
+const (
+	ghReleaseCheckTimeout    = 30 * time.Second
+	ghReleaseDownloadTimeout = 3 * time.Minute
+)
 
 type updateState struct {
 	LastCheck      string `json:"lastCheck"`
@@ -40,10 +47,13 @@ func CheckForUpdate(currentVersion string, force bool) (string, error) {
 			}
 		}
 	}
-	if _, err := runner.LookPath("gh"); err != nil {
+	if _, err := getRunner().LookPath("gh"); err != nil {
 		return "", nil
 	}
-	out, err := runner.Output("gh", "release", "view", "latest", "--repo", repoName, "--json", "tagName")
+
+	ctx, cancel := context.WithTimeout(context.Background(), ghReleaseCheckTimeout)
+	defer cancel()
+	out, err := getRunner().OutputContext(ctx, "gh", "release", "view", "latest", "--repo", repoName, "--json", "tagName")
 	if err != nil {
 		return "", nil
 	}
@@ -54,7 +64,7 @@ func CheckForUpdate(currentVersion string, force bool) (string, error) {
 		return "", err
 	}
 	latest := strings.TrimPrefix(strings.TrimSpace(payload.TagName), "v")
-	_ = saveState(updateState{LastCheck: clk.Now().UTC().Format(time.RFC3339), LatestVersion: latest, CurrentVersion: currentVersion})
+	_ = saveState(updateState{LastCheck: getClk().Now().UTC().Format(time.RFC3339), LatestVersion: latest, CurrentVersion: currentVersion})
 	if compareVersions(currentVersion, latest) < 0 {
 		return latest, nil
 	}
@@ -62,7 +72,7 @@ func CheckForUpdate(currentVersion string, force bool) (string, error) {
 }
 
 func Perform(currentVersion string, opts Options, logger *output.Logger) error {
-	if _, err := runner.LookPath("gh"); err != nil {
+	if _, err := getRunner().LookPath("gh"); err != nil {
 		return fmt.Errorf("gh CLI not found")
 	}
 	latest, err := CheckForUpdate(currentVersion, opts.ForceCheck)
@@ -73,29 +83,40 @@ func Perform(currentVersion string, opts Options, logger *output.Logger) error {
 		logger.Success("Already up to date")
 		return nil
 	}
-	binaryPath, err := runner.LookPath("paw")
+	binaryPath, err := getRunner().LookPath("paw")
 	if err != nil {
 		return fmt.Errorf("paw binary not found in PATH")
 	}
 	asset := fmt.Sprintf("paw-%s-%s", runtime.GOOS, mapArch(runtime.GOARCH))
-	tmpDir := filepath.Join("/tmp", fmt.Sprintf("paw-update-%d", clk.Now().UnixMilli()))
-	if err := fsys.MkdirAll(tmpDir, 0o755); err != nil {
+
+	// Fix M6: use os.MkdirTemp for an unpredictable temp directory
+	tmpDir, err := os.MkdirTemp("", "paw-update-*")
+	if err != nil {
 		return err
 	}
-	defer fsys.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir)
 
 	if opts.DryRun {
 		logger.DryRun(fmt.Sprintf("Would download %s and replace %s", asset, binaryPath))
 		return nil
 	}
 	args := []string{"release", "download", "latest", "--repo", repoName, "--pattern", asset, "--dir", tmpDir}
-	if !opts.SkipVerify {
-		helpOut, _ := runner.Output("gh", "release", "download", "--help")
+
+	// Fix I2: warn explicitly when attestation verification is unavailable
+	if opts.SkipVerify {
+		fmt.Fprintf(os.Stderr, "WARNING: Binary verification skipped (--skip-verify flag).\n")
+	} else {
+		helpOut, _ := getRunner().Output("gh", "release", "download", "--help")
 		if strings.Contains(string(helpOut), "verify-attestation") {
 			args = append(args, "--verify-attestation")
+		} else {
+			fmt.Fprintf(os.Stderr, "WARNING: gh CLI does not support attestation verification. Update gh to enable binary verification. Proceeding without verification.\n")
 		}
 	}
-	if out, err := runner.CombinedOutput("gh", args...); err != nil {
+
+	dlCtx, dlCancel := context.WithTimeout(context.Background(), ghReleaseDownloadTimeout)
+	defer dlCancel()
+	if out, err := getRunner().CombinedOutputContext(dlCtx, "gh", args...); err != nil {
 		return fmt.Errorf("download failed: %s", strings.TrimSpace(string(out)))
 	}
 
@@ -104,18 +125,19 @@ func Perform(currentVersion string, opts Options, logger *output.Logger) error {
 	if err := copyFile(binaryPath, backup); err != nil {
 		return err
 	}
-	if err := fsys.Rename(downloaded, binaryPath); err != nil {
-		_ = fsys.Rename(backup, binaryPath)
+	if err := getFsys().Rename(downloaded, binaryPath); err != nil {
+		_ = getFsys().Rename(backup, binaryPath)
 		return err
 	}
-	if err := fsys.Chmod(binaryPath, 0o755); err != nil {
+	if err := getFsys().Chmod(binaryPath, 0o755); err != nil {
+		_ = getFsys().Rename(backup, binaryPath)
 		return err
 	}
-	if out, err := runner.CombinedOutput(binaryPath, "--version"); err != nil {
-		_ = fsys.Rename(backup, binaryPath)
+	if out, err := getRunner().CombinedOutput(binaryPath, "--version"); err != nil {
+		_ = getFsys().Rename(backup, binaryPath)
 		return fmt.Errorf("verification failed: %s", strings.TrimSpace(string(out)))
 	}
-	_ = fsys.Remove(backup)
+	_ = getFsys().Remove(backup)
 	logger.Success(fmt.Sprintf("Updated paw: v%s -> v%s", currentVersion, latest))
 	return nil
 }
@@ -159,11 +181,11 @@ func mapArch(arch string) string {
 }
 
 func copyFile(src string, dst string) error {
-	in, err := fsys.ReadFile(src)
+	in, err := getFsys().ReadFile(src)
 	if err != nil {
 		return err
 	}
-	return fsys.WriteFile(dst, in, 0o755)
+	return getFsys().WriteFile(dst, in, 0o755)
 }
 
 func loadState() (*updateState, error) {
@@ -171,7 +193,7 @@ func loadState() (*updateState, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := fsys.ReadFile(path)
+	data, err := getFsys().ReadFile(path)
 	if err != nil {
 		return nil, nil
 	}
@@ -191,5 +213,6 @@ func saveState(st updateState) error {
 	if err != nil {
 		return err
 	}
-	return fsys.WriteFile(path, payload, 0o644)
+	// Fix I4: use 0o600 to restrict state file to owner-only
+	return getFsys().WriteFile(path, payload, 0o600)
 }

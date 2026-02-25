@@ -52,7 +52,7 @@ func Inspect(ctx Context) (Report, error) {
 		return Report{}, err
 	}
 	report := Report{
-		Timestamp: clk.Now().UTC().Format(time.RFC3339),
+		Timestamp: getClk().Now().UTC().Format(time.RFC3339),
 		RepoPath:  ctx.RepoPath,
 		HomePath:  ctx.HomePath,
 		Scope:     scope,
@@ -122,7 +122,7 @@ func InspectFiles(ctx Context) ([]Finding, error) {
 
 func InspectBrew(ctx Context) ([]Finding, error) {
 	tracked := filepath.Join(ctx.RepoPath, filepath.FromSlash(brewfileRelPath))
-	if _, err := runner.LookPath("brew"); err != nil {
+	if _, err := getRunner().LookPath("brew"); err != nil {
 		return []Finding{{
 			Scope:      ScopePackages,
 			Kind:       KindBrewUnavailable,
@@ -137,7 +137,7 @@ func InspectBrew(ctx Context) ([]Finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	trackedBytes, err := fsys.ReadFile(tracked)
+	trackedBytes, err := getFsys().ReadFile(tracked)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []Finding{{
@@ -260,7 +260,7 @@ func ApplyFiles(ctx Context, findings []Finding) ([]Finding, []Finding, []Findin
 			failed = append(failed, withDetail(finding, err.Error()))
 			continue
 		}
-		targetBytes, err := fsys.ReadFile(entry.TargetAbs)
+		targetBytes, err := getFsys().ReadFile(entry.TargetAbs)
 		if err != nil {
 			failed = append(failed, withDetail(finding, err.Error()))
 			continue
@@ -271,11 +271,11 @@ func ApplyFiles(ctx Context, findings []Finding) ([]Finding, []Finding, []Findin
 			continue
 		}
 
-		if err := fsys.MkdirAll(filepath.Dir(entry.SourceAbs), 0o755); err != nil {
+		if err := getFsys().MkdirAll(filepath.Dir(entry.SourceAbs), 0o755); err != nil {
 			failed = append(failed, withDetail(finding, err.Error()))
 			continue
 		}
-		if err := fsys.WriteFile(entry.SourceAbs, targetBytes, 0o644); err != nil {
+		if err := getFsys().WriteFile(entry.SourceAbs, targetBytes, 0o644); err != nil {
 			failed = append(failed, withDetail(finding, err.Error()))
 			continue
 		}
@@ -299,7 +299,7 @@ func ApplyFiles(ctx Context, findings []Finding) ([]Finding, []Finding, []Findin
 				backups = append(backups, backup.BackupEntry{
 					Original:  st.Target,
 					Backup:    st.BackupPath,
-					Timestamp: clk.Now().UnixMilli(),
+					Timestamp: getClk().Now().UnixMilli(),
 				})
 			}
 		}
@@ -330,7 +330,7 @@ func ApplyBrew(ctx Context, findings []Finding) ([]Finding, []Finding, []Finding
 		}
 		return []Finding{}, skipped, []Finding{}, nil
 	}
-	if _, err := runner.LookPath("brew"); err != nil {
+	if _, err := getRunner().LookPath("brew"); err != nil {
 		failed := make([]Finding, 0, len(targetFindings))
 		for _, finding := range targetFindings {
 			failed = append(failed, withDetail(finding, "brew is not available in PATH"))
@@ -344,11 +344,11 @@ func ApplyBrew(ctx Context, findings []Finding) ([]Finding, []Finding, []Finding
 	applied := []Finding{}
 	failed := []Finding{}
 	for _, finding := range targetFindings {
-		if err := fsys.MkdirAll(filepath.Dir(finding.SourcePath), 0o755); err != nil {
+		if err := getFsys().MkdirAll(filepath.Dir(finding.SourcePath), 0o755); err != nil {
 			failed = append(failed, withDetail(finding, err.Error()))
 			continue
 		}
-		if err := fsys.WriteFile(finding.SourcePath, snapshot, 0o644); err != nil {
+		if err := getFsys().WriteFile(finding.SourcePath, snapshot, 0o644); err != nil {
 			failed = append(failed, withDetail(finding, err.Error()))
 			continue
 		}
@@ -386,7 +386,7 @@ func summarize(findings []Finding) Summary {
 }
 
 func classifyConflict(entry symlink.Entry) (Finding, error) {
-	info, err := fsys.Lstat(entry.TargetAbs)
+	info, err := getFsys().Lstat(entry.TargetAbs)
 	if err != nil {
 		return Finding{}, err
 	}
@@ -416,7 +416,7 @@ func classifyConflict(entry symlink.Entry) (Finding, error) {
 }
 
 func classifySourceMissing(entry symlink.Entry) (Finding, bool, error) {
-	info, err := fsys.Lstat(entry.TargetAbs)
+	info, err := getFsys().Lstat(entry.TargetAbs)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Finding{}, false, nil
@@ -456,10 +456,10 @@ func dumpBrewfileSnapshot() ([]byte, error) {
 	defer os.RemoveAll(tmpDir)
 
 	tmpPath := filepath.Join(tmpDir, "Brewfile")
-	if err := runner.Run("brew", "bundle", "dump", "--file", tmpPath, "--force"); err != nil {
+	if err := getRunner().Run("brew", "bundle", "dump", "--file", tmpPath, "--force"); err != nil {
 		return nil, err
 	}
-	return fsys.ReadFile(tmpPath)
+	return getFsys().ReadFile(tmpPath)
 }
 
 func withDetail(f Finding, detail string) Finding {

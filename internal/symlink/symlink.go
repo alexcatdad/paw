@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/alexcatdad/paw/internal/config"
 	"github.com/alexcatdad/paw/internal/execx"
@@ -69,16 +71,17 @@ type backupMove struct {
 func BuildEntries(repoDir string, homeDir string, cfg config.Config) ([]Entry, error) {
 	entries := map[string]Entry{}
 	homeRoot := filepath.Join(repoDir, "home")
-	_ = filepath.WalkDir(homeRoot, func(path string, d fs.DirEntry, err error) error {
+	// Fix M2: propagate walk errors instead of silently dropping them.
+	if err := filepath.WalkDir(homeRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 		if d.IsDir() {
 			return nil
 		}
 		rel, err := filepath.Rel(homeRoot, path)
 		if err != nil {
-			return nil
+			return err
 		}
 		targetRel := filepath.ToSlash(rel)
 		if isIgnored(targetRel, cfg.Ignore.Paths) {
@@ -92,7 +95,13 @@ func BuildEntries(repoDir string, homeDir string, cfg config.Config) ([]Entry, e
 			TargetAbs: filepath.Join(homeDir, rel),
 		}
 		return nil
-	})
+	}); err != nil {
+		// homeRoot may not exist yet (empty or newly-initialized repo).
+		// Treat ErrNotExist as non-fatal; propagate all other errors.
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("walk %s: %w", homeRoot, err)
+		}
+	}
 
 	for sourceRel, override := range cfg.Overrides {
 		sourcePath := filepath.Join(repoDir, filepath.FromSlash(sourceRel))
@@ -163,7 +172,10 @@ func Create(entries []Entry, opts LinkOptions, logger *output.Logger) ([]State, 
 		}
 		if applyErr != nil {
 			if !opts.DryRun {
-				_ = rollbackTransaction(txn, logger)
+				// Fix M8 caller: handle the rollback error instead of discarding it.
+				if rbErr := rollbackTransaction(txn, logger); rbErr != nil {
+					logger.Warn(fmt.Sprintf("Rollback encountered errors: %v", rbErr))
+				}
 			}
 			return states, applyErr
 		}
@@ -174,7 +186,7 @@ func Create(entries []Entry, opts LinkOptions, logger *output.Logger) ([]State, 
 
 func createOne(entry Entry, opts LinkOptions, pending *conflictChoice, txn *transaction, logger *output.Logger) (State, *conflictChoice, error) {
 	st := State{Source: entry.SourceAbs, Target: entry.TargetAbs, Status: StatusMissing}
-	if _, err := fsys.Stat(entry.SourceAbs); err != nil {
+	if _, err := getFsys().Stat(entry.SourceAbs); err != nil {
 		logger.Error(fmt.Sprintf("Source not found: %s", repo.ContractHome(entry.SourceAbs)))
 		st.Status = StatusSourceMissing
 		return st, pending, nil
@@ -227,16 +239,16 @@ func createOne(entry Entry, opts LinkOptions, pending *conflictChoice, txn *tran
 			if opts.DryRun {
 				logger.DryRun(fmt.Sprintf("Would overwrite %s", repo.ContractHome(entry.TargetAbs)))
 			} else {
-				if err := fsys.Remove(entry.TargetAbs); err != nil {
+				if err := getFsys().Remove(entry.TargetAbs); err != nil {
 					return st, pending, err
 				}
 			}
 		case "backup":
-			backupPath := fmt.Sprintf("%s.backup.%d", entry.TargetAbs, clk.Now().UnixMilli())
+			backupPath := fmt.Sprintf("%s.backup.%d", entry.TargetAbs, getClk().Now().UnixMilli())
 			if opts.DryRun {
 				logger.DryRun(fmt.Sprintf("Would backup %s -> %s", repo.ContractHome(entry.TargetAbs), repo.ContractHome(backupPath)))
 			} else {
-				if err := fsys.Rename(entry.TargetAbs, backupPath); err != nil {
+				if err := getFsys().Rename(entry.TargetAbs, backupPath); err != nil {
 					return st, pending, err
 				}
 				txn.Backups = append(txn.Backups, backupMove{Original: entry.TargetAbs, Backup: backupPath})
@@ -263,10 +275,10 @@ func createOne(entry Entry, opts LinkOptions, pending *conflictChoice, txn *tran
 		return st, pending, nil
 	}
 
-	if err := fsys.MkdirAll(filepath.Dir(entry.TargetAbs), 0o755); err != nil {
+	if err := getFsys().MkdirAll(filepath.Dir(entry.TargetAbs), 0o755); err != nil {
 		return st, pending, err
 	}
-	if err := fsys.Symlink(entry.SourceAbs, entry.TargetAbs); err != nil {
+	if err := getFsys().Symlink(entry.SourceAbs, entry.TargetAbs); err != nil {
 		return st, pending, err
 	}
 	txn.Created = append(txn.Created, entry.TargetAbs)
@@ -285,7 +297,7 @@ func Remove(entries []Entry, opts LinkOptions, logger *output.Logger) error {
 		if err := validateTarget(entry.TargetAbs); err != nil {
 			return err
 		}
-		info, err := fsys.Lstat(entry.TargetAbs)
+		info, err := getFsys().Lstat(entry.TargetAbs)
 		if err != nil {
 			continue
 		}
@@ -297,7 +309,7 @@ func Remove(entries []Entry, opts LinkOptions, logger *output.Logger) error {
 			logger.DryRun(fmt.Sprintf("Would remove symlink: %s", repo.ContractHome(entry.TargetAbs)))
 			continue
 		}
-		if err := fsys.Remove(entry.TargetAbs); err != nil {
+		if err := getFsys().Remove(entry.TargetAbs); err != nil {
 			return err
 		}
 		logger.Success(fmt.Sprintf("Removed %s", repo.ContractHome(entry.TargetAbs)))
@@ -323,7 +335,7 @@ func Status(entries []Entry) ([]State, error) {
 			states = append(states, st)
 			continue
 		}
-		if _, err := fsys.Stat(entry.SourceAbs); err != nil {
+		if _, err := getFsys().Stat(entry.SourceAbs); err != nil {
 			st.Status = StatusSourceMissing
 			states = append(states, st)
 			continue
@@ -365,7 +377,7 @@ func isIgnored(targetRel string, ignore []string) bool {
 }
 
 func fileOrLinkExists(path string) (bool, error) {
-	_, err := fsys.Lstat(path)
+	_, err := getFsys().Lstat(path)
 	if err == nil {
 		return true, nil
 	}
@@ -376,14 +388,14 @@ func fileOrLinkExists(path string) (bool, error) {
 }
 
 func isSymlinkTo(linkPath string, expectedTarget string) (bool, error) {
-	info, err := fsys.Lstat(linkPath)
+	info, err := getFsys().Lstat(linkPath)
 	if err != nil {
 		return false, err
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
 		return false, nil
 	}
-	actual, err := fsys.Readlink(linkPath)
+	actual, err := getFsys().Readlink(linkPath)
 	if err != nil {
 		return false, err
 	}
@@ -453,10 +465,44 @@ func promptConflict(target string, source string) (conflictChoice, error) {
 }
 
 func showDiff(target string, source string) {
-	_ = runner.RunWith("diff", []string{"-u", target, source}, execx.CommandOptions{
+	_ = getRunner().RunWith("diff", []string{"-u", target, source}, execx.CommandOptions{
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	})
+}
+
+// pidIsAlive checks whether the process with the given PID is still running.
+// Returns true if alive (kill(pid, 0) returned nil or EPERM),
+// false if the process is definitively dead (ESRCH).
+func pidIsAlive(pid int) bool {
+	err := syscall.Kill(pid, 0)
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, syscall.EPERM) {
+		// Process exists but we lack permission to signal it.
+		return true
+	}
+	// syscall.ESRCH — no such process; stale lock.
+	return false
+}
+
+// readPIDFromLockFile reads the PID stored in a lock file as "pid=<N>\n".
+// Returns 0 and a non-nil error when the file cannot be read or parsed.
+func readPIDFromLockFile(path string) (int, error) {
+	data, err := getFsys().ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	line := strings.TrimSpace(string(data))
+	if !strings.HasPrefix(line, "pid=") {
+		return 0, fmt.Errorf("unexpected lock file format: %q", line)
+	}
+	pid, err := strconv.Atoi(strings.TrimPrefix(line, "pid="))
+	if err != nil {
+		return 0, fmt.Errorf("invalid PID in lock file: %w", err)
+	}
+	return pid, nil
 }
 
 func acquireLock() (func(), error) {
@@ -464,13 +510,59 @@ func acquireLock() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := fsys.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+
+	// Fix I4: use 0o600 instead of 0o644.
+	f, err := getFsys().OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err == nil {
+		if _, werr := f.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid())); werr != nil {
+			_ = f.Close()
+			_ = getFsys().Remove(lockPath)
+			return nil, fmt.Errorf("failed to write lock file: %w", werr)
+		}
+		if cerr := f.Close(); cerr != nil {
+			_ = getFsys().Remove(lockPath)
+			return nil, fmt.Errorf("failed to close lock file: %w", cerr)
+		}
+		return func() { _ = getFsys().Remove(lockPath) }, nil
+	}
+
+	// Fix I1: stale lock recovery.
+	// The lock file already exists (EEXIST). For any other error (permissions,
+	// path issues), fail immediately with a descriptive message.
+	if !os.IsExist(err) {
+		return nil, fmt.Errorf("failed to create lock file: %w", err)
+	}
+
+	// Determine whether the owning process is still alive before refusing to proceed.
+	pid, parseErr := readPIDFromLockFile(lockPath)
+	if parseErr != nil {
+		// Cannot read/parse lock file — treat as a live lock to be safe.
+		return nil, fmt.Errorf("another paw operation is running")
+	}
+
+	if pidIsAlive(pid) {
+		return nil, fmt.Errorf("another paw operation is running (pid=%d)", pid)
+	}
+
+	// The process is gone — stale lock. Remove it and retry once.
+	if removeErr := getFsys().Remove(lockPath); removeErr != nil {
+		return nil, fmt.Errorf("another paw operation is running (pid=%d)", pid)
+	}
+
+	f, err = getFsys().OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("another paw operation is running")
 	}
-	_, _ = f.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid()))
-	_ = f.Close()
-	return func() { _ = fsys.Remove(lockPath) }, nil
+	if _, werr := f.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid())); werr != nil {
+		_ = f.Close()
+		_ = getFsys().Remove(lockPath)
+		return nil, fmt.Errorf("failed to write lock file: %w", werr)
+	}
+	if cerr := f.Close(); cerr != nil {
+		_ = getFsys().Remove(lockPath)
+		return nil, fmt.Errorf("failed to close lock file: %w", cerr)
+	}
+	return func() { _ = getFsys().Remove(lockPath) }, nil
 }
 
 func saveTransaction(txn transaction) error {
@@ -482,26 +574,42 @@ func saveTransaction(txn transaction) error {
 	if err != nil {
 		return err
 	}
-	return fsys.WriteFile(path, payload, 0o644)
+	return getFsys().WriteFile(path, payload, 0o600)
 }
 
 func cleanupTransactionFile() {
 	path, err := state.TransactionPath()
 	if err == nil {
-		_ = fsys.Remove(path)
+		_ = getFsys().Remove(path)
 	}
 }
 
+// rollbackTransaction reverses a transaction by removing created symlinks and
+// restoring backed-up files. It collects all errors encountered during rollback
+// and returns a combined error if any step failed. Fix M8: previously always
+// returned nil.
 func rollbackTransaction(txn transaction, logger *output.Logger) error {
+	var errs []string
+
 	for i := len(txn.Created) - 1; i >= 0; i-- {
-		_ = fsys.Remove(txn.Created[i])
+		if err := getFsys().Remove(txn.Created[i]); err != nil {
+			msg := fmt.Sprintf("failed to remove created link %s: %v", repo.ContractHome(txn.Created[i]), err)
+			logger.Warn(msg)
+			errs = append(errs, msg)
+		}
 	}
 	for i := len(txn.Backups) - 1; i >= 0; i-- {
 		move := txn.Backups[i]
-		_ = fsys.Remove(move.Original)
-		if err := fsys.Rename(move.Backup, move.Original); err != nil {
-			logger.Warn(fmt.Sprintf("Failed to restore %s: %v", repo.ContractHome(move.Original), err))
+		_ = getFsys().Remove(move.Original)
+		if err := getFsys().Rename(move.Backup, move.Original); err != nil {
+			msg := fmt.Sprintf("Failed to restore %s: %v", repo.ContractHome(move.Original), err)
+			logger.Warn(msg)
+			errs = append(errs, msg)
 		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("rollback errors: %s", strings.Join(errs, "; "))
 	}
 	return nil
 }

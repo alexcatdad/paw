@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -69,14 +70,15 @@ func MatchPlatform(allowed []string, current string) bool {
 }
 
 func MatchHostname(pattern string, hostname string) bool {
-	if strings.TrimSpace(pattern) == "" || pattern == "*" {
+	normalizedPattern := strings.TrimSpace(pattern)
+	if normalizedPattern == "" || normalizedPattern == "*" {
 		return true
 	}
-	// Very small glob support: '*' and exact string
-	if strings.Contains(pattern, "*") {
-		prefix := strings.Split(pattern, "*")[0]
-		suffix := strings.Split(pattern, "*")[len(strings.Split(pattern, "*"))-1]
-		return strings.HasPrefix(hostname, prefix) && strings.HasSuffix(hostname, suffix)
+	// Use filepath.Match for proper glob semantics
+	matched, err := filepath.Match(strings.ToLower(normalizedPattern), strings.ToLower(hostname))
+	if err != nil {
+		// Invalid pattern - fall back to exact match
+		return strings.EqualFold(normalizedPattern, hostname)
 	}
-	return strings.EqualFold(pattern, hostname)
+	return matched
 }
