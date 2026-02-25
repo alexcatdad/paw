@@ -2,10 +2,7 @@ package packages
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -112,7 +109,7 @@ func TestInstallAllWSLBrewSelectionAndCheckBranches(t *testing.T) {
 	}
 }
 
-func TestEnsureBrewAndLinuxFontErrorBranches(t *testing.T) {
+func TestEnsureBrewAndFontErrorBranches(t *testing.T) {
 	logger := output.NewLogger("text", true, false)
 
 	t.Run("brew install completes but still missing", func(t *testing.T) {
@@ -121,76 +118,40 @@ func TestEnsureBrewAndLinuxFontErrorBranches(t *testing.T) {
 			RunWithFn:  func(string, []string, execx.CommandOptions) error { return nil },
 		}
 		withRunner(t, missingAfterInstall)
-		if _, err := ensureBrew(false, logger); err == nil {
+		// Confirm with "y" so we reach the brew script, which succeeds but brew
+		// is still not found afterward.
+		if _, err := ensureBrew(false, strings.NewReader("y\n"), logger); err == nil {
 			t.Fatal("expected ensureBrew missing-after-install error")
 		}
 	})
 
-	t.Run("tmp dir mkdir error", func(t *testing.T) {
-		home := t.TempDir()
-		t.Setenv("HOME", home)
-		tmpDir := filepath.Join("/tmp", "paw-font-"+strconv.Itoa(os.Getpid()))
-		_ = os.RemoveAll(tmpDir)
-		if err := os.WriteFile(tmpDir, []byte("x"), 0o644); err != nil {
-			t.Fatal(err)
+	t.Run("installFont no brew path", func(t *testing.T) {
+		fake := &testutil.FakeRunner{
+			RunFn: func(name string, args ...string) error { return errors.New("not installed") },
 		}
-		t.Cleanup(func() { _ = os.Remove(tmpDir) })
-
-		withRunner(t, &testutil.FakeRunner{
-			CombinedOutputFn: func(string, ...string) ([]byte, error) { return []byte(""), nil },
-		})
-		if err := installLinuxFont(false, logger); err == nil {
-			t.Fatal("expected tmp mkdir error")
+		withRunner(t, fake)
+		if err := installFont(config.PackageConfig{}, "", false, logger); err == nil {
+			t.Fatal("expected error when brew path is empty")
 		}
 	})
 
-	t.Run("curl error", func(t *testing.T) {
-		home := t.TempDir()
-		t.Setenv("HOME", home)
-		withRunner(t, &testutil.FakeRunner{
-			CombinedOutputFn: func(string, ...string) ([]byte, error) { return []byte(""), nil },
-			RunFn: func(name string, args ...string) error {
-				if name == "curl" {
-					return errors.New("curl failed")
-				}
-				return nil
-			},
-		})
-		if err := installLinuxFont(false, logger); err == nil {
-			t.Fatal("expected curl error")
+	t.Run("installFont brew cask install fails", func(t *testing.T) {
+		fake := &testutil.FakeRunner{
+			RunFn: func(name string, args ...string) error { return errors.New("brew error") },
+		}
+		withRunner(t, fake)
+		if err := installFont(config.PackageConfig{}, "/brew", false, logger); err == nil {
+			t.Fatal("expected error on brew cask install failure")
 		}
 	})
 
-	t.Run("unzip error", func(t *testing.T) {
-		home := t.TempDir()
-		t.Setenv("HOME", home)
-		withRunner(t, &testutil.FakeRunner{
-			CombinedOutputFn: func(string, ...string) ([]byte, error) { return []byte(""), nil },
-			RunFn: func(name string, args ...string) error {
-				if name == "unzip" {
-					return errors.New("unzip failed")
-				}
-				return nil
-			},
-		})
-		if err := installLinuxFont(false, logger); err == nil {
-			t.Fatal("expected unzip error")
+	t.Run("installFont dry run always succeeds", func(t *testing.T) {
+		fake := &testutil.FakeRunner{
+			RunFn: func(name string, args ...string) error { return errors.New("not installed") },
 		}
-	})
-
-	t.Run("font dir mkdir error", func(t *testing.T) {
-		root := t.TempDir()
-		homeFile := filepath.Join(root, "home-file")
-		if err := os.WriteFile(homeFile, []byte("x"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("HOME", homeFile)
-		withRunner(t, &testutil.FakeRunner{
-			CombinedOutputFn: func(string, ...string) ([]byte, error) { return []byte(""), nil },
-			RunFn:            func(string, ...string) error { return nil },
-		})
-		if err := installLinuxFont(false, logger); err == nil {
-			t.Fatal("expected font dir mkdir error")
+		withRunner(t, fake)
+		if err := installFont(config.PackageConfig{NerdFont: "Hack"}, "/brew", true, logger); err != nil {
+			t.Fatalf("expected dry-run success, got: %v", err)
 		}
 	})
 }

@@ -23,6 +23,6 @@ docker run --rm \
   -v "${ROOT_DIR}:/workspace" \
   -w /workspace \
   "${IMAGE_TAG}" \
-  bash -c 'if [[ "${SKIP_QUALITY:-0}" != "1" ]]; then ./scripts/test/quality-check.sh; fi && ./scripts/test/coverage-check.sh && go test -race ./internal/symlink ./internal/backup ./internal/repo ./internal/update ./internal/cli'
+  bash -c 'if [[ "${SKIP_QUALITY:-0}" != "1" ]]; then ./scripts/test/quality-check.sh; fi && ./scripts/test/coverage-check.sh && go test -race ./internal/...'
 
 echo "Docker CI test run complete."

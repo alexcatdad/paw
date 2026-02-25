@@ -1,16 +1,25 @@
 package packages
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/alexcatdad/paw/internal/config"
 	"github.com/alexcatdad/paw/internal/execx"
 	"github.com/alexcatdad/paw/internal/output"
 	"github.com/alexcatdad/paw/internal/platform"
+)
+
+const (
+	pkgInstallTimeout = 5 * time.Minute
 )
 
 var packageNamePattern = regexp.MustCompile(`^[@a-zA-Z0-9_\/-]{1,255}$`)
@@ -46,7 +55,7 @@ func InstallAll(cfg config.PackageConfig, opts Options, logger *output.Logger) R
 		}
 	}
 
-	brewPath, err := ensureBrew(opts.DryRun, logger)
+	brewPath, err := ensureBrew(opts.DryRun, os.Stdin, logger)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Homebrew unavailable: %v", err))
 	}
@@ -67,7 +76,9 @@ func InstallAll(cfg config.PackageConfig, opts Options, logger *output.Logger) R
 
 	if brewPath != "" {
 		if !opts.DryRun {
-			_ = runCmd(brewPath, "update")
+			updateCtx, updateCancel := context.WithTimeout(context.Background(), pkgInstallTimeout)
+			defer updateCancel()
+			_ = runCmdContext(updateCtx, brewPath, "update")
 		}
 		logger.Subheader("Installing brew packages")
 		for _, pkg := range pkgs {
@@ -81,7 +92,7 @@ func InstallAll(cfg config.PackageConfig, opts Options, logger *output.Logger) R
 	}
 
 	if current == platform.Linux || current == platform.WSL {
-		_ = installLinuxFont(opts.DryRun, logger)
+		_ = installFont(cfg, brewPath, opts.DryRun, logger)
 	}
 
 	return result
@@ -111,8 +122,11 @@ func Check(cfg config.PackageConfig) (installed []string, missing []string) {
 	return installed, missing
 }
 
-func ensureBrew(dryRun bool, logger *output.Logger) (string, error) {
-	if path, err := runner.LookPath("brew"); err == nil {
+// ensureBrew returns the path to brew, installing it after user confirmation
+// if it is not already present. stdin is used to read the confirmation answer
+// so it can be injected in tests.
+func ensureBrew(dryRun bool, stdin io.Reader, logger *output.Logger) (string, error) {
+	if path, err := getRunner().LookPath("brew"); err == nil {
 		return path, nil
 	}
 	if dryRun {
@@ -122,14 +136,25 @@ func ensureBrew(dryRun bool, logger *output.Logger) (string, error) {
 		}
 		return "/home/linuxbrew/.linuxbrew/bin/brew", nil
 	}
-	logger.Info("Homebrew not found. Installing...")
-	if err := runner.RunWith("/bin/bash", []string{"-c", "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"}, execx.CommandOptions{
+
+	fmt.Print("Homebrew is not installed. Install it now? This will download and run the official Homebrew install script. [y/N] ")
+	scanner := bufio.NewScanner(stdin)
+	scanner.Scan()
+	answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+	if answer != "y" && answer != "yes" {
+		return "", errors.New("homebrew installation declined by user")
+	}
+
+	logger.Info("Installing Homebrew...")
+	brewInstallCtx, brewInstallCancel := context.WithTimeout(context.Background(), pkgInstallTimeout)
+	defer brewInstallCancel()
+	if err := getRunner().RunWithContext(brewInstallCtx, "/bin/bash", []string{"-c", "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"}, execx.CommandOptions{
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}); err != nil {
 		return "", err
 	}
-	if path, err := runner.LookPath("brew"); err == nil {
+	if path, err := getRunner().LookPath("brew"); err == nil {
 		return path, nil
 	}
 	return "", errors.New("homebrew install finished but brew not found")
@@ -148,11 +173,13 @@ func installBrew(pkg string, brewPath string, dryRun bool, logger *output.Logger
 		logger.DryRun(fmt.Sprintf("Would install %s", pkg))
 		return true
 	}
-	if err := runCmd(brewPath, "install", pkg); err == nil {
+	ctx, cancel := context.WithTimeout(context.Background(), pkgInstallTimeout)
+	defer cancel()
+	if err := runCmdContext(ctx, brewPath, "install", pkg); err == nil {
 		logger.Success(fmt.Sprintf("Installed %s", pkg))
 		return true
 	}
-	if err := runCmd(brewPath, "install", "--cask", pkg); err == nil {
+	if err := runCmdContext(ctx, brewPath, "install", "--cask", pkg); err == nil {
 		logger.Success(fmt.Sprintf("Installed %s (cask)", pkg))
 		return true
 	}
@@ -173,7 +200,9 @@ func installApt(pkg string, dryRun bool, logger *output.Logger) bool {
 		logger.DryRun(fmt.Sprintf("Would install via apt: %s", pkg))
 		return true
 	}
-	if err := runCmd("sudo", "apt", "install", "-y", pkg); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), pkgInstallTimeout)
+	defer cancel()
+	if err := runCmdContext(ctx, "sudo", "apt", "install", "-y", pkg); err != nil {
 		logger.Error(fmt.Sprintf("Failed apt install for %s: %v", pkg, err))
 		return false
 	}
@@ -181,58 +210,69 @@ func installApt(pkg string, dryRun bool, logger *output.Logger) bool {
 	return true
 }
 
-func installLinuxFont(dryRun bool, logger *output.Logger) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	fontDir := filepathJoin(home, ".local", "share", "fonts")
-	if output, err := runner.CombinedOutput("fc-list"); err == nil {
-		if strings.Contains(strings.ToLower(string(output)), "firacode nerd") {
-			logger.Info("FiraCode Nerd Font already installed")
-			return nil
+// fontCaskName converts a nerd font name from the config into the
+// corresponding Homebrew cask name.
+// Example: "JetBrainsMono" -> "font-jet-brains-mono-nerd-font"
+func fontCaskName(name string) string {
+	// Insert a hyphen before each uppercase letter that follows a lowercase
+	// letter or digit (CamelCase -> kebab-case).
+	var b strings.Builder
+	runes := []rune(name)
+	for i, r := range runes {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			prev := runes[i-1]
+			if (prev >= 'a' && prev <= 'z') || (prev >= '0' && prev <= '9') {
+				b.WriteRune('-')
+			}
 		}
+		b.WriteRune(r)
 	}
-	if dryRun {
-		logger.DryRun("Would install FiraCode Nerd Font")
+	return "font-" + strings.ToLower(b.String()) + "-nerd-font"
+}
+
+// installFont installs the nerd font specified in the config using Homebrew
+// casks. This eliminates the shell-injection risk of the prior manual
+// download+copy approach.
+func installFont(cfg config.PackageConfig, brewPath string, dryRun bool, logger *output.Logger) error {
+	fontName := cfg.NerdFont
+	if fontName == "" {
+		fontName = "FiraCode"
+	}
+	cask := fontCaskName(fontName)
+
+	// Check whether the cask is already installed.
+	if brewPath != "" && runCmd(brewPath, "list", "--cask", cask) == nil {
+		logger.Info(fmt.Sprintf("%s already installed", cask))
 		return nil
 	}
-	tmp := filepathJoin("/tmp", fmt.Sprintf("paw-font-%d", os.Getpid()))
-	if err := os.MkdirAll(tmp, 0o755); err != nil {
-		return err
+
+	if dryRun {
+		logger.DryRun(fmt.Sprintf("Would install %s via brew --cask", cask))
+		return nil
 	}
-	defer os.RemoveAll(tmp)
-	zipPath := filepathJoin(tmp, "FiraCode.zip")
-	if err := runCmd("curl", "-fsSL", "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/FiraCode.zip", "-o", zipPath); err != nil {
-		return err
+
+	if brewPath == "" {
+		return errors.New("brew not available; cannot install font")
 	}
-	if err := runCmd("unzip", "-q", zipPath, "-d", tmp); err != nil {
-		return err
+
+	ctx, cancel := context.WithTimeout(context.Background(), pkgInstallTimeout)
+	defer cancel()
+	if err := runCmdContext(ctx, brewPath, "install", "--cask", cask); err != nil {
+		return fmt.Errorf("brew install --cask %s: %w", cask, err)
 	}
-	if err := os.MkdirAll(fontDir, 0o755); err != nil {
-		return err
-	}
-	_ = runCmd("sh", "-c", fmt.Sprintf("cp %s/*.ttf %s/ 2>/dev/null || true", tmp, fontDir))
+
+	// Refresh the font cache so the font is immediately available.
+	fontDir := filepath.Join(os.Getenv("HOME"), ".local", "share", "fonts")
 	_ = runCmd("fc-cache", "-f", fontDir)
-	logger.Success("Installed FiraCode Nerd Font")
+
+	logger.Success(fmt.Sprintf("Installed %s", cask))
 	return nil
 }
 
 func runCmd(name string, args ...string) error {
-	return runner.Run(name, args...)
+	return getRunner().Run(name, args...)
 }
 
-func filepathJoin(parts ...string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-	current := parts[0]
-	for _, p := range parts[1:] {
-		if strings.HasSuffix(current, "/") {
-			current += p
-		} else {
-			current += "/" + p
-		}
-	}
-	return current
+func runCmdContext(ctx context.Context, name string, args ...string) error {
+	return getRunner().RunContext(ctx, name, args...)
 }

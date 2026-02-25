@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexcatdad/paw/internal/app"
 	"github.com/alexcatdad/paw/internal/backup"
 	"github.com/alexcatdad/paw/internal/config"
 	"github.com/alexcatdad/paw/internal/drift"
@@ -19,20 +20,20 @@ import (
 func loadConfigEntries(logger *output.Logger) (string, string, config.Config, []symlink.Entry, error) {
 	repoDir, err := repo.RepoDir()
 	if err != nil {
-		return "", "", config.Config{}, nil, err
+		return "", "", config.Config{}, nil, app.WithCode(app.ExitConfig, err)
 	}
 	cfgPath := repo.ConfigPath(repoDir)
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		return "", "", config.Config{}, nil, err
+		return "", "", config.Config{}, nil, app.WithCode(app.ExitConfig, err)
 	}
 	homeDir, err := repo.HomeDir()
 	if err != nil {
-		return "", "", config.Config{}, nil, err
+		return "", "", config.Config{}, nil, app.WithCode(app.ExitConfig, err)
 	}
 	entries, err := symlink.BuildEntries(repoDir, homeDir, cfg)
 	if err != nil {
-		return "", "", config.Config{}, nil, err
+		return "", "", config.Config{}, nil, app.WithCode(app.ExitConfig, err)
 	}
 	logger.Debug(fmt.Sprintf("Loaded %d link entries", len(entries)))
 	return repoDir, homeDir, cfg, entries, nil

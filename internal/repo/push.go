@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -17,7 +18,7 @@ func RunPush(message string, opts PushOptions, logger *output.Logger) error {
 	if err != nil {
 		return err
 	}
-	statusOut, err := runner.CombinedOutput("git", "-C", repoPath, "status", "--porcelain")
+	statusOut, err := getRunner().CombinedOutput("git", "-C", repoPath, "status", "--porcelain")
 	if err != nil {
 		return fmt.Errorf("git status failed: %s", strings.TrimSpace(string(statusOut)))
 	}
@@ -30,22 +31,25 @@ func RunPush(message string, opts PushOptions, logger *output.Logger) error {
 		logger.Info(changes)
 	}
 	if strings.TrimSpace(message) == "" {
-		message = fmt.Sprintf("Update dotfiles (%s)", clk.Now().Format("2006-01-02"))
+		message = fmt.Sprintf("Update dotfiles (%s)", getClk().Now().Format("2006-01-02"))
 	}
 	if opts.DryRun {
 		logger.DryRun("Would stage, commit, and push changes")
 		return nil
 	}
-	if out, err := runner.CombinedOutput("git", "-C", repoPath, "add", "-A"); err != nil {
+	if out, err := getRunner().CombinedOutput("git", "-C", repoPath, "add", "-A"); err != nil {
 		return fmt.Errorf("git add failed: %s", strings.TrimSpace(string(out)))
 	}
-	if out, err := runner.CombinedOutput("git", "-C", repoPath, "commit", "-m", message); err != nil {
+	if out, err := getRunner().CombinedOutput("git", "-C", repoPath, "commit", "-m", message); err != nil {
 		if strings.Contains(strings.ToLower(string(out)), "nothing to commit") {
 			return nil
 		}
 		return fmt.Errorf("git commit failed: %s", strings.TrimSpace(string(out)))
 	}
-	if out, err := runner.CombinedOutput("git", "-C", repoPath, "push"); err != nil {
+
+	pushCtx, pushCancel := context.WithTimeout(context.Background(), gitOpTimeout)
+	defer pushCancel()
+	if out, err := getRunner().CombinedOutputContext(pushCtx, "git", "-C", repoPath, "push"); err != nil {
 		return fmt.Errorf("git push failed: %s", strings.TrimSpace(string(out)))
 	}
 	logger.Success("Pushed changes")

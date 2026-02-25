@@ -109,7 +109,10 @@ func newRollbackCommand(opts *app.GlobalOptions) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return backup.Rollback(cfg, backup.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger)
+		if err := backup.Rollback(cfg, backup.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
+			return app.WithCode(app.ExitRollbackError, err)
+		}
+		return nil
 	}}
 }
 
@@ -121,7 +124,7 @@ func newSyncCommand(opts *app.GlobalOptions) *cobra.Command {
 			return err
 		}
 		if err := hooks.Run("pre_sync", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-			return err
+			return app.WithCode(app.ExitHookFailure, err)
 		}
 		if !opts.SkipUpdate {
 			latest, _ := update.CheckForUpdate(Version(), false)
@@ -153,7 +156,7 @@ func newSyncCommand(opts *app.GlobalOptions) *cobra.Command {
 			_ = saveLastRun("sync", states)
 		}
 		if err := hooks.Run("post_sync", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-			return err
+			return app.WithCode(app.ExitHookFailure, err)
 		}
 		logger.Success("Sync complete")
 		return nil
@@ -190,14 +193,14 @@ func newPushCommand(opts *app.GlobalOptions) *cobra.Command {
 		}
 		_ = repoDir
 		if err := hooks.Run("pre_push", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-			return err
+			return app.WithCode(app.ExitHookFailure, err)
 		}
 		message := strings.Join(args, " ")
 		if err := repo.RunPush(message, repo.PushOptions{DryRun: opts.DryRun, Verbose: opts.Verbose}, logger); err != nil {
 			return err
 		}
 		if err := hooks.Run("post_push", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-			return err
+			return app.WithCode(app.ExitHookFailure, err)
 		}
 		return nil
 	}}
@@ -280,7 +283,7 @@ func newScaffoldCommand(opts *app.GlobalOptions) *cobra.Command {
 		logger := newLogger(opts)
 		repoDir, err := repo.RepoDir()
 		if err != nil {
-			return err
+			return app.WithCode(app.ExitConfig, err)
 		}
 		if len(args) == 0 || (len(args) == 1 && strings.EqualFold(args[0], "list")) {
 			scaffold.List(logger)
@@ -306,7 +309,7 @@ func newMigrateCommand(opts *app.GlobalOptions) *cobra.Command {
 		logger := newLogger(opts)
 		repoDir, err := repo.RepoDir()
 		if err != nil {
-			return err
+			return app.WithCode(app.ExitConfig, err)
 		}
 		if strings.TrimSpace(source) == "" {
 			source = filepath.Join(repoDir, "dotfiles.config.ts")
@@ -320,7 +323,7 @@ func newMigrateCommand(opts *app.GlobalOptions) *cobra.Command {
 		}
 		result, err := config.MigrateTSConfig(source, outputPath)
 		if err != nil {
-			return err
+			return app.WithCode(app.ExitConfig, err)
 		}
 		logger.Success(fmt.Sprintf("Created %s", outputPath))
 		logger.Info(fmt.Sprintf("Migrated symlinks: %d, templates: %d", len(result.Symlinks), len(result.Templates)))
@@ -340,7 +343,7 @@ func runInstall(cmd *cobra.Command, opts *app.GlobalOptions) error {
 	logger.Header("Dotfiles Install")
 	printSystemTable(logger, repoDir, homeDir)
 	if err := hooks.Run("pre_install", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-		return err
+		return app.WithCode(app.ExitHookFailure, err)
 	}
 	if !opts.SkipPackages {
 		result := packages.InstallAll(cfg.Packages, packages.Options{DryRun: opts.DryRun}, logger)
@@ -354,7 +357,7 @@ func runInstall(cmd *cobra.Command, opts *app.GlobalOptions) error {
 		return err
 	}
 	if err := hooks.Run("post_install", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-		return err
+		return app.WithCode(app.ExitHookFailure, err)
 	}
 	if !opts.DryRun {
 		if err := saveLastRun("install", states); err != nil {
@@ -392,7 +395,7 @@ func runLink(cmd *cobra.Command, opts *app.GlobalOptions) error {
 	}
 	_ = repoDir
 	if err := hooks.Run("pre_link", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-		return err
+		return app.WithCode(app.ExitHookFailure, err)
 	}
 	states, err := symlink.Create(entries, symlink.LinkOptions{DryRun: opts.DryRun, Force: opts.Force, NoInteractive: opts.NoInteractive}, logger)
 	if err != nil {
@@ -402,7 +405,7 @@ func runLink(cmd *cobra.Command, opts *app.GlobalOptions) error {
 		return err
 	}
 	if err := hooks.Run("post_link", cfg, hooks.Options{DryRun: opts.DryRun, SkipHooks: opts.SkipHooks}, logger); err != nil {
-		return err
+		return app.WithCode(app.ExitHookFailure, err)
 	}
 	if !opts.DryRun {
 		_ = saveLastRun("link", states)

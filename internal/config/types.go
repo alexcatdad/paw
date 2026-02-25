@@ -18,6 +18,10 @@ type PackageConfig struct {
 	LinuxBrew []string `toml:"linux_brew"`
 	WSLAPT    []string `toml:"wsl_apt"`
 	WSLBrew   []string `toml:"wsl_brew"`
+	// NerdFont is the name of the Nerd Font to install on Linux/WSL via
+	// Homebrew cask, e.g. "JetBrainsMono" or "FiraCode". Defaults to
+	// "FiraCode" when empty.
+	NerdFont string `toml:"nerd_font"`
 }
 
 type HookConfig struct {
